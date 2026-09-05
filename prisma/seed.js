@@ -8,6 +8,7 @@ async function main() {
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
   await prisma.coupon.deleteMany();
+  await prisma.productImage.deleteMany();
   await prisma.product.deleteMany();
 
   // 1. Seed Products
