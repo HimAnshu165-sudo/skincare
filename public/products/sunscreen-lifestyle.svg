@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" width="100%" height="100%">
+  <defs>
+    <linearGradient id="sunBeam" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF5E5" stop-opacity="0.9" />
+      <stop offset="50%" stop-color="#FAF0DF" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#E8DAC4" stop-opacity="1" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="1000" fill="#E8DEC9" />
+  <polygon points="0,0 800,200 800,1000 0,800" fill="url(#sunBeam)" />
+  
+  <!-- Palm Leaf Botanical Shadow Overlay -->
+  <path d="M0,0 Q300,300 150,600 Q450,250 800,150 Q600,450 700,900" stroke="#3A3225" stroke-width="45" stroke-linecap="round" fill="none" opacity="0.08" />
+  
+  <text x="400" y="480" font-family="'Cormorant Garamond', serif" font-size="44" font-weight="500" letter-spacing="0.14em" text-anchor="middle" fill="#1A1918">VELYRA</text>
+  <text x="400" y="530" font-family="'Plus Jakarta Sans', sans-serif" font-size="14" letter-spacing="0.2em" text-anchor="middle" fill="#6A6255">EVERYDAY SUN ARCHITECTURE</text>
+</svg>

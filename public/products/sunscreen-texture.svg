@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" width="100%" height="100%">
+  <defs>
+    <radialGradient id="texBg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#FBF8F3" />
+      <stop offset="70%" stop-color="#EDE5D8" />
+      <stop offset="100%" stop-color="#DDD2C1" />
+    </radialGradient>
+    <radialGradient id="dropGrad" cx="35%" cy="30%" r="65%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="40%" stop-color="#FBF7EE" />
+      <stop offset="85%" stop-color="#EFE6D4" />
+      <stop offset="100%" stop-color="#D9CBB5" />
+    </radialGradient>
+    <filter id="dropShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="15" dy="30" stdDeviation="25" flood-color="#1E1B17" flood-opacity="0.16" />
+    </filter>
+  </defs>
+  <rect width="800" height="1000" fill="url(#texBg)" />
+  <g filter="url(#dropShadow)">
+    <path d="M400,280 C560,280 660,420 640,580 C620,720 500,780 400,780 C290,780 180,710 160,560 C140,410 250,280 400,280 Z" fill="url(#dropGrad)" />
+    <!-- Gloss highlight curve -->
+    <path d="M300,360 C380,310 490,320 540,380 C500,345 400,340 330,385 Z" fill="#FFFFFF" opacity="0.85" />
+    <ellipse cx="480" cy="450" rx="45" ry="25" transform="rotate(-25 480 450)" fill="#FFFFFF" opacity="0.6" />
+  </g>
+  <text x="400" y="860" font-family="'Cormorant Garamond', serif" font-size="26" font-style="italic" letter-spacing="0.08em" text-anchor="middle" fill="#60574B">Weightless Silk Fluid • Zero White Cast</text>
+</svg>

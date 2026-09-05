@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" width="100%" height="100%">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="45%" r="65%">
+      <stop offset="0%" stop-color="#FDFBF7" />
+      <stop offset="60%" stop-color="#F2ECE4" />
+      <stop offset="100%" stop-color="#E5DDD2" />
+    </radialGradient>
+    <linearGradient id="bottleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#EDE6DC" />
+      <stop offset="25%" stop-color="#FAF7F2" />
+      <stop offset="70%" stop-color="#F5F0E8" />
+      <stop offset="100%" stop-color="#D9CFBF" />
+    </linearGradient>
+    <linearGradient id="capGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#B88646" />
+      <stop offset="35%" stop-color="#E4BA78" />
+      <stop offset="70%" stop-color="#C49350" />
+      <stop offset="100%" stop-color="#8E6126" />
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="35" stdDeviation="30" flood-color="#1A1918" flood-opacity="0.12" />
+    </filter>
+  </defs>
+  <rect width="800" height="1000" fill="url(#bgGlow)" />
+  <!-- Subtle aesthetic background circle -->
+  <circle cx="400" cy="500" r="320" fill="#EAE2D5" opacity="0.4" />
+  
+  <!-- Bottle Group with Shadow -->
+  <g filter="url(#softShadow)">
+    <!-- Base Shadow beneath bottle -->
+    <ellipse cx="400" cy="810" rx="140" ry="24" fill="#2D2720" opacity="0.15" />
+    
+    <!-- Bottle Body -->
+    <rect x="290" y="360" width="220" height="420" rx="36" fill="url(#bottleGrad)" stroke="#E0D6C8" stroke-width="1.5" />
+    
+    <!-- Bottle Neck -->
+    <rect x="360" y="315" width="80" height="50" rx="4" fill="#D9CFBF" />
+    
+    <!-- Luxury Gold Cap -->
+    <rect x="350" y="220" width="100" height="100" rx="12" fill="url(#capGrad)" stroke="#8E6126" stroke-width="1" />
+    <!-- Cap Knurling / Detail Lines -->
+    <line x1="365" y1="220" x2="365" y2="320" stroke="#FFF" stroke-opacity="0.25" stroke-width="1.5" />
+    <line x1="435" y1="220" x2="435" y2="320" stroke="#000" stroke-opacity="0.15" stroke-width="1.5" />
+
+    <!-- Minimalist Editorial Label on Bottle -->
+    <text x="400" y="470" font-family="'Cormorant Garamond', Georgia, serif" font-size="28" font-weight="600" letter-spacing="0.22em" text-anchor="middle" fill="#1A1918">VELYRA</text>
+    <line x1="350" y1="495" x2="450" y2="495" stroke="#C49350" stroke-width="1" />
+    <text x="400" y="530" font-family="'Plus Jakarta Sans', sans-serif" font-size="13" font-weight="600" letter-spacing="0.16em" text-anchor="middle" fill="#2A2826">SILK-AIR FLUID</text>
+    <text x="400" y="555" font-family="'Plus Jakarta Sans', sans-serif" font-size="11" font-weight="500" letter-spacing="0.14em" text-anchor="middle" fill="#6A645A">SUNSCREEN</text>
+    <text x="400" y="605" font-family="'Plus Jakarta Sans', sans-serif" font-size="14" font-weight="700" letter-spacing="0.12em" text-anchor="middle" fill="#1A1918">SPF 50+ • PA++++</text>
+    <text x="400" y="635" font-family="'Plus Jakarta Sans', sans-serif" font-size="10" font-weight="400" letter-spacing="0.18em" text-anchor="middle" fill="#887F73">BROAD SPECTRUM UVA/UVB</text>
+    <text x="400" y="725" font-family="'Plus Jakarta Sans', sans-serif" font-size="11" font-weight="500" letter-spacing="0.12em" text-anchor="middle" fill="#485246">50 ml / 1.69 fl. oz.</text>
+  </g>
+</svg>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" width="100%" height="100%">
+  <rect width="800" height="1000" fill="#ECEFEA" />
+  <g>
+    <ellipse cx="400" cy="780" rx="120" ry="20" fill="#1E241D" opacity="0.12" />
+    <rect x="310" y="360" width="180" height="400" rx="30" fill="#F4F8F3" stroke="#D1DDD0" stroke-width="2" />
+    <rect x="360" y="280" width="80" height="90" rx="10" fill="#485246" />
+    <rect x="390" y="240" width="80" height="45" rx="6" fill="#2E362C" />
+    <text x="400" y="500" font-family="'Cormorant Garamond', serif" font-size="26" letter-spacing="0.2em" text-anchor="middle" fill="#1A1918">VELYRA</text>
+    <text x="400" y="540" font-family="'Plus Jakarta Sans', sans-serif" font-size="11" font-weight="600" letter-spacing="0.14em" text-anchor="middle" fill="#485246">AMINO JELLY CLEANSER</text>
+    <text x="400" y="570" font-family="'Plus Jakarta Sans', sans-serif" font-size="10" letter-spacing="0.12em" text-anchor="middle" fill="#758273">LOW pH 5.5 BALANCED</text>
+  </g>
+</svg>

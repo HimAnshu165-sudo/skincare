@@ -1,0 +1,102 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Product {
+  id              String         @id @default(cuid())
+  name            String
+  slug            String         @unique
+  tagline         String
+  description     String
+  price           Float
+  mrp             Float
+  inStock         Boolean        @default(true)
+  stockQuantity   Int            @default(100)
+  sku             String         @unique
+  volume          String         // e.g. "50ml / 1.7 fl. oz."
+  spfRating       String?        // e.g. "SPF 50+ PA++++"
+  finish          String?        // e.g. "Invisible Dewy-Matte"
+  skinType        String?        // e.g. "All Skin Types • Non-Comedogenic"
+  images          String         // JSON stringified array of URLs (legacy/fallback)
+  productImages   ProductImage[]
+  benefits        String         // JSON stringified array of strings
+  keyIngredients  String         // JSON stringified array of { name: string, benefit: string }
+  fullIngredients String
+  howToUse        String
+  isFeatured      Boolean        @default(false)
+  isUpcoming      Boolean        @default(false)
+  category        String         // "Sunscreens" | "Moisturizers" | "Cleansers" | "Sets"
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  orderItems      OrderItem[]
+}
+
+model ProductImage {
+  id          String   @id @default(cuid())
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url         String
+  pathname    String
+  alt         String
+  sortOrder   Int      @default(0)
+  isPrimary   Boolean  @default(false)
+  width       Int?
+  height      Int?
+  size        Int?
+  contentType String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Order {
+  id                String      @id @default(cuid())
+  orderNumber       String      @unique
+  customerName      String
+  customerEmail     String
+  customerPhone     String
+  shippingAddress   String      // JSON stringified: { address, apartment, city, state, pincode }
+  paymentMethod     String      // "ONLINE" | "COD"
+  paymentStatus     String      @default("PENDING") // "PENDING" | "PAID" | "FAILED"
+  orderStatus       String      @default("PLACED")  // "PLACED" | "CONFIRMED" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED"
+  subtotal          Float
+  discount          Float       @default(0)
+  shippingFee       Float       @default(0)
+  total             Float
+  couponCode        String?
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  trackingNumber    String?
+  courierName       String?
+  notes             String?
+  items             OrderItem[]
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+model OrderItem {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  productName String
+  quantity    Int
+  price       Float
+  volume      String?
+}
+
+model Coupon {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  discountType  String    // "PERCENTAGE" | "FIXED"
+  discountValue Float
+  minOrderValue Float     @default(0)
+  isActive      Boolean   @default(true)
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+}
