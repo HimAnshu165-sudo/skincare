@@ -16,16 +16,48 @@ export function HeroSection({ heroProduct }: HeroSectionProps) {
 
   return (
     <section className="relative min-h-[90vh] flex items-center bg-surface-base border-b border-border-subtle overflow-hidden">
-      {/* Background Graphic Accents */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full bg-surface-muted/60 blur-3xl pointer-events-none" />
+      {/* Background Cinematic Video Layer */}
+      <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none z-0">
+        {/* Full-bleed HTML5 Video */}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          poster="/products/sunscreen-lifestyle.webp"
+          className="w-full h-full object-cover object-[center_35%] sm:object-center motion-reduce:hidden"
+          aria-hidden="true"
+          tabIndex={-1}
+        >
+          <source src="/Hero.mp4" type="video/mp4" />
+        </video>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 w-full">
+        {/* Fallback Static Visual for prefers-reduced-motion */}
+        <div className="hidden motion-reduce:block w-full h-full relative">
+          <Image
+            src="/products/sunscreen-lifestyle.webp"
+            alt=""
+            fill
+            priority
+            className="object-cover object-center"
+            aria-hidden="true"
+          />
+        </div>
+
+        {/* Editorial Protective Gradient & Tint Overlay for Readability */}
+        <div className="absolute inset-0 bg-surface-base/70 sm:bg-gradient-to-r sm:from-surface-base/92 sm:via-surface-base/65 sm:to-surface-base/25" />
+        <div className="absolute inset-0 bg-brand-charcoal/[0.02] mix-blend-multiply" />
+      </div>
+
+      {/* Hero Content Container */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 w-full">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
           
           {/* Left Editorial Narrative */}
           <div className="lg:col-span-6 space-y-6 sm:space-y-8 text-center lg:text-left">
             {/* Top Label */}
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-surface-muted border border-border-subtle rounded-full text-[11px] font-semibold uppercase tracking-widest text-brand-charcoal">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-surface-muted/90 backdrop-blur-sm border border-border-subtle rounded-full text-[11px] font-semibold uppercase tracking-widest text-brand-charcoal shadow-sm">
               <span className="w-1.5 h-1.5 rounded-full bg-brand-amber animate-pulse"></span>
               <span>The Inaugural Formulation</span>
             </div>
@@ -41,7 +73,7 @@ export function HeroSection({ heroProduct }: HeroSectionProps) {
             </div>
 
             {/* Spec Highlights Micro Grid */}
-            <div className="grid grid-cols-3 gap-4 pt-2 border-y border-border-subtle/80 py-4 max-w-lg mx-auto lg:mx-0 text-left">
+            <div className="grid grid-cols-3 gap-4 pt-2 border-y border-border-subtle/80 py-4 max-w-lg mx-auto lg:mx-0 text-left bg-surface-base/40 backdrop-blur-[2px] rounded-sm px-2">
               <div>
                 <div className="text-xs uppercase tracking-wider text-brand-mineral">Protection</div>
                 <div className="font-serif text-lg text-brand-charcoal font-semibold">SPF 50+ PA++++</div>
@@ -67,7 +99,7 @@ export function HeroSection({ heroProduct }: HeroSectionProps) {
               </Link>
               <Link
                 href="/about"
-                className="w-full sm:w-auto border border-border-strong px-7 py-4 text-xs uppercase tracking-widest font-semibold text-brand-charcoal hover:bg-surface-muted transition-colors rounded-sm text-center"
+                className="w-full sm:w-auto bg-surface-base/80 backdrop-blur-sm border border-border-strong px-7 py-4 text-xs uppercase tracking-widest font-semibold text-brand-charcoal hover:bg-surface-muted transition-colors rounded-sm text-center shadow-sm"
               >
                 Our Formulation Ethos
               </Link>
@@ -81,7 +113,7 @@ export function HeroSection({ heroProduct }: HeroSectionProps) {
 
           {/* Right Product Hero Showcase */}
           <div className="lg:col-span-6 relative flex items-center justify-center">
-            <div className="relative w-full max-w-md aspect-[4/5] bg-surface-muted rounded-2xl overflow-hidden shadow-2xl border border-border-subtle p-8 flex items-center justify-center group">
+            <div className="relative w-full max-w-md aspect-[4/5] bg-surface-muted/90 backdrop-blur-md rounded-2xl overflow-hidden shadow-2xl border border-border-subtle/80 p-8 flex items-center justify-center group">
               {/* Product Visual */}
               <div className="relative w-full h-full transition-transform duration-700 ease-out group-hover:scale-105">
                 <Image
@@ -89,7 +121,7 @@ export function HeroSection({ heroProduct }: HeroSectionProps) {
                   alt="VELYRA Silk-Air Fluid Sunscreen SPF 50+"
                   fill
                   priority
-                  className="object-contain"
+                  className="object-contain drop-shadow-md"
                 />
               </div>
 
