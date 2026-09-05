@@ -7,6 +7,82 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// --------------------------------------------------
+// USER & AUTHENTICATION
+// --------------------------------------------------
+
+model User {
+  id            String      @id @default(cuid())
+  name          String
+  email         String      @unique
+  password      String      // Hashed with bcrypt
+  phone         String?
+  role          String      @default("CUSTOMER") // "CUSTOMER" | "ADMIN"
+  addresses     Address[]
+  cart          Cart?
+  orders        Order[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([email])
+}
+
+model Address {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName     String
+  phone        String
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  state        String
+  postalCode   String
+  country      String   @default("India")
+  addressType  String   @default("HOME") // "HOME" | "WORK" | "OTHER"
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// --------------------------------------------------
+// CART SYSTEM (USER & GUEST)
+// --------------------------------------------------
+
+model Cart {
+  id         String     @id @default(cuid())
+  userId     String?    @unique
+  user       User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guestToken String?    @unique
+  items      CartItem[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([guestToken])
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, productId])
+  @@index([cartId])
+  @@index([productId])
+}
+
+// --------------------------------------------------
+// PRODUCT CATALOG
+// --------------------------------------------------
+
 model Product {
   id              String         @id @default(cuid())
   name            String
@@ -24,6 +100,8 @@ model Product {
   skinType        String?        // e.g. "All Skin Types • Non-Comedogenic"
   images          String         // JSON stringified array of URLs (legacy/fallback)
   productImages   ProductImage[]
+  cartItems       CartItem[]
+  orderItems      OrderItem[]
   benefits        String         // JSON stringified array of strings
   keyIngredients  String         // JSON stringified array of { name: string, benefit: string }
   fullIngredients String
@@ -33,7 +111,10 @@ model Product {
   category        String         // "Sunscreens" | "Moisturizers" | "Cleansers" | "Sets"
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
-  orderItems      OrderItem[]
+
+  @@index([slug])
+  @@index([category])
+  @@index([isFeatured])
 }
 
 model ProductImage {
@@ -51,31 +132,48 @@ model ProductImage {
   contentType String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([productId])
 }
 
+// --------------------------------------------------
+// ORDERS & PAYMENTS
+// --------------------------------------------------
+
 model Order {
-  id                String      @id @default(cuid())
-  orderNumber       String      @unique
-  customerName      String
-  customerEmail     String
-  customerPhone     String
-  shippingAddress   String      // JSON stringified: { address, apartment, city, state, pincode }
-  paymentMethod     String      // "ONLINE" | "COD"
-  paymentStatus     String      @default("PENDING") // "PENDING" | "PAID" | "FAILED"
-  orderStatus       String      @default("PLACED")  // "PLACED" | "CONFIRMED" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED"
-  subtotal          Float
-  discount          Float       @default(0)
-  shippingFee       Float       @default(0)
-  total             Float
-  couponCode        String?
-  razorpayOrderId   String?
-  razorpayPaymentId String?
-  trackingNumber    String?
-  courierName       String?
-  notes             String?
-  items             OrderItem[]
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
+  id                  String               @id @default(cuid())
+  orderNumber         String               @unique // e.g. "VEL-89234"
+  userId              String?
+  user                User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customerName        String
+  customerEmail       String
+  customerPhone       String
+  shippingAddress     String               // JSON snapshot: { fullName, phone, addressLine1, addressLine2, city, state, postalCode }
+  paymentMethod       String               // "ONLINE" | "COD"
+  paymentStatus       String               @default("PENDING") // "PENDING" | "PAID" | "FAILED" | "REFUNDED"
+  orderStatus         String               @default("PLACED")  // "PLACED" | "CONFIRMED" | "PROCESSING" | "PACKED" | "SHIPPED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED"
+  subtotal            Float
+  discount            Float                @default(0)
+  shippingFee         Float                @default(0)
+  total               Float
+  couponCode          String?
+  razorpayOrderId     String?
+  razorpayPaymentId   String?
+  trackingNumber      String?
+  courierName         String?
+  trackingUrl         String?
+  notes               String?
+  items               OrderItem[]
+  payments            Payment[]
+  statusHistory       OrderStatusHistory[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([userId])
+  @@index([orderNumber])
+  @@index([orderStatus])
+  @@index([paymentStatus])
+  @@index([createdAt])
 }
 
 model OrderItem {
@@ -85,10 +183,55 @@ model OrderItem {
   productId   String
   product     Product  @relation(fields: [productId], references: [id])
   productName String
+  productSlug String?
+  productSku  String?
+  imageUrl    String?
   quantity    Int
-  price       Float
+  price       Float    // Snapshot of price at time of order
   volume      String?
+  createdAt   DateTime @default(now())
+
+  @@index([orderId])
+  @@index([productId])
 }
+
+model Payment {
+  id                String   @id @default(cuid())
+  orderId           String
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount            Float
+  currency          String   @default("INR")
+  method            String   // "RAZORPAY" | "COD"
+  status            String   @default("PENDING") // "PENDING" | "PAID" | "FAILED" | "REFUNDED"
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  razorpaySignature String?
+  rawPayload        String?  // JSON metadata/logs for idempotency and webhooks
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([razorpayOrderId])
+  @@index([razorpayPaymentId])
+}
+
+model OrderStatusHistory {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status      String   // "PLACED" | "CONFIRMED" | "PROCESSING" | "PACKED" | "SHIPPED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED"
+  title       String
+  description String?
+  location    String?
+  createdAt   DateTime @default(now())
+
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+// --------------------------------------------------
+// PROMOTIONS & MARKETING
+// --------------------------------------------------
 
 model Coupon {
   id            String    @id @default(cuid())
@@ -99,4 +242,6 @@ model Coupon {
   isActive      Boolean   @default(true)
   expiresAt     DateTime?
   createdAt     DateTime  @default(now())
+
+  @@index([code])
 }

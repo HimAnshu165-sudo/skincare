@@ -2,7 +2,8 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { X, ArrowRight, ShieldCheck, HelpCircle, Phone } from 'lucide-react';
+import { X, ArrowRight, ShieldCheck, User as UserIcon, Package, MapPin, LogOut } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 interface MobileNavProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface MobileNavProps {
 }
 
 export function MobileNav({ isOpen, onClose, links }: MobileNavProps) {
+  const { user, logout } = useAuth();
   if (!isOpen) return null;
 
   return (
@@ -22,7 +24,7 @@ export function MobileNav({ isOpen, onClose, links }: MobileNavProps) {
       />
 
       {/* Slide Drawer */}
-      <div className="fixed inset-y-0 left-0 max-w-xs w-full bg-surface-base shadow-2xl flex flex-col justify-between p-6 z-10 animate-fade-in border-r border-border-subtle">
+      <div className="fixed inset-y-0 left-0 max-w-xs w-full bg-surface-base shadow-2xl flex flex-col justify-between p-6 z-10 animate-fade-in border-r border-border-subtle overflow-y-auto">
         <div>
           {/* Header */}
           <div className="flex items-center justify-between pb-6 border-b border-border-subtle">
@@ -31,21 +33,70 @@ export function MobileNav({ isOpen, onClose, links }: MobileNavProps) {
             </span>
             <button
               onClick={onClose}
-              className="p-1.5 text-brand-mineral hover:text-brand-charcoal transition-colors"
+              className="p-1.5 text-brand-charcoal/60 hover:text-brand-charcoal transition-colors"
               aria-label="Close menu"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
+          {/* User Status Strip */}
+          <div className="mt-4 p-3 bg-surface-elevated border border-border-subtle rounded-xs">
+            {user ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-full bg-brand-sand/60 text-brand-charcoal text-xs font-semibold flex items-center justify-center border border-brand-sand">
+                    {user.name ? user.name[0].toUpperCase() : 'U'}
+                  </div>
+                  <div className="truncate">
+                    <p className="text-xs font-medium text-brand-charcoal truncate">{user.name}</p>
+                    <p className="text-[10px] text-foreground/50 truncate">{user.email}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border-subtle text-[11px]">
+                  <Link
+                    href="/account/orders"
+                    onClick={onClose}
+                    className="flex items-center gap-1.5 text-foreground/70 hover:text-brand-charcoal"
+                  >
+                    <Package className="w-3.5 h-3.5" />
+                    <span>My Orders</span>
+                  </Link>
+                  <button
+                    onClick={() => {
+                      onClose();
+                      logout();
+                    }}
+                    className="flex items-center gap-1.5 text-red-600 text-left"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <Link
+                href="/login"
+                onClick={onClose}
+                className="flex items-center justify-between text-xs font-medium text-brand-charcoal"
+              >
+                <div className="flex items-center gap-2">
+                  <UserIcon className="w-4 h-4 text-brand-charcoal/70" />
+                  <span>Sign In / Create Account</span>
+                </div>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            )}
+          </div>
+
           {/* Links */}
-          <nav className="mt-8 flex flex-col gap-6">
+          <nav className="mt-6 flex flex-col gap-5">
             {links.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={onClose}
-                className="flex items-center justify-between text-base uppercase tracking-wider font-medium text-brand-charcoal hover:text-brand-amber transition-colors group"
+                className="flex items-center justify-between text-sm uppercase tracking-wider font-medium text-brand-charcoal hover:text-brand-amber transition-colors group"
               >
                 <span>{link.label}</span>
                 <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-brand-amber" />
@@ -62,7 +113,7 @@ export function MobileNav({ isOpen, onClose, links }: MobileNavProps) {
               Dermatologist Formulated • 100% Indian Fitzpatrick Safe
             </div>
           </div>
-          <div className="text-xs text-brand-mineral flex items-center justify-between">
+          <div className="text-xs text-foreground/60 flex items-center justify-between">
             <span>Concierge Support:</span>
             <a
               href="https://wa.me/919876543210"

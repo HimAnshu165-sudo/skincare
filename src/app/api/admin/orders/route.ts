@@ -1,63 +1,57 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdmin } from '@/lib/auth';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
-    const orders = await prisma.order.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        items: true,
-      },
-    });
-
-    const parsed = orders.map((o) => ({
-      ...o,
-      shippingAddress:
-        typeof o.shippingAddress === 'string'
-          ? JSON.parse(o.shippingAddress)
-          : o.shippingAddress,
-    }));
-
-    return NextResponse.json({ success: true, orders: parsed });
-  } catch (error: any) {
-    console.error('Error fetching admin orders:', error);
-    return NextResponse.json(
-      { success: false, message: 'Failed to fetch admin orders.' },
-      { status: 500 }
-    );
-  }
-}
-
-export async function PATCH(request: Request) {
-  try {
-    const { orderId, orderStatus, paymentStatus, trackingNumber, courierName } =
-      await request.json();
-
-    if (!orderId) {
-      return NextResponse.json(
-        { success: false, message: 'Missing orderId.' },
-        { status: 400 }
-      );
+    const isAuthorized = await requireAdmin(request);
+    if (!isAuthorized) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
     }
 
-    const updated = await prisma.order.update({
-      where: { id: orderId },
-      data: {
-        ...(orderStatus && { orderStatus }),
-        ...(paymentStatus && { paymentStatus }),
-        ...(trackingNumber && { trackingNumber }),
-        ...(courierName && { courierName }),
-      },
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get('status');
+    const paymentStatus = searchParams.get('paymentStatus');
+
+    const where: any = {};
+    if (status && status !== 'ALL') where.orderStatus = status;
+    if (paymentStatus && paymentStatus !== 'ALL') where.paymentStatus = paymentStatus;
+
+    const orders = await prisma.order.findMany({
+      where,
       include: {
         items: true,
+        payments: true,
+        statusHistory: { orderBy: { createdAt: 'desc' } },
+        user: { select: { id: true, name: true, email: true } },
       },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
     });
 
-    return NextResponse.json({ success: true, order: updated });
+    const formatted = orders.map((order) => {
+      let shippingAddress = {};
+      try {
+        shippingAddress = typeof order.shippingAddress === 'string'
+          ? JSON.parse(order.shippingAddress)
+          : order.shippingAddress;
+      } catch {
+        shippingAddress = order.shippingAddress;
+      }
+
+      return {
+        ...order,
+        shippingAddress,
+      };
+    });
+
+    return NextResponse.json({ success: true, orders: formatted });
   } catch (error: any) {
-    console.error('Error updating order:', error);
+    console.error('Admin orders fetch error:', error);
     return NextResponse.json(
-      { success: false, message: 'Failed to update order status.' },
+      { success: false, message: 'Failed to fetch admin orders.' },
       { status: 500 }
     );
   }

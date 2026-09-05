@@ -31,7 +31,7 @@ export interface Product {
 }
 
 export interface CartItem {
-  id: string; // product id
+  id: string;
   productId: string;
   name: string;
   slug: string;
@@ -40,8 +40,8 @@ export interface CartItem {
   quantity: number;
   image: string;
   volume: string;
-  sku: string;
-  inStock: boolean;
+  sku?: string;
+  inStock?: boolean;
 }
 
 export interface ShippingAddress {

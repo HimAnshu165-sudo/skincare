@@ -1,45 +1,90 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
+import { verifyRazorpaySignature } from '@/lib/razorpay';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const { orderId, razorpay_order_id, razorpay_payment_id, razorpay_signature } =
-      await request.json();
+    const body = await request.json();
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      orderId,
+    } = body;
 
-    const keySecret = process.env.RAZORPAY_KEY_SECRET || '';
-
-    // Signature verification
-    if (keySecret && !keySecret.includes('placeholder')) {
-      const generatedSignature = crypto
-        .createHmac('sha256', keySecret)
-        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-        .digest('hex');
-
-      if (generatedSignature !== razorpay_signature) {
-        return NextResponse.json(
-          { success: false, message: 'Invalid payment signature.' },
-          { status: 400 }
-        );
-      }
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !orderId) {
+      return NextResponse.json(
+        { success: false, message: 'Missing payment signature verification parameters.' },
+        { status: 400 }
+      );
     }
 
-    // Update order status in DB
-    const updatedOrder = await prisma.order.update({
+    // Cryptographic signature check
+    const isValid = verifyRazorpaySignature(
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature
+    );
+
+    if (!isValid) {
+      // Record failed payment
+      await prisma.payment.updateMany({
+        where: { orderId },
+        data: {
+          status: 'FAILED',
+          razorpayPaymentId: razorpay_payment_id,
+          razorpaySignature: razorpay_signature,
+        },
+      });
+
+      return NextResponse.json(
+        { success: false, message: 'Invalid payment signature. Verification failed.' },
+        { status: 400 }
+      );
+    }
+
+    // Update Order and Payment to PAID
+    await prisma.$transaction([
+      prisma.order.update({
+        where: { id: orderId },
+        data: {
+          paymentStatus: 'PAID',
+          orderStatus: 'CONFIRMED',
+          razorpayPaymentId: razorpay_payment_id,
+        },
+      }),
+      prisma.payment.updateMany({
+        where: { orderId },
+        data: {
+          status: 'PAID',
+          razorpayPaymentId: razorpay_payment_id,
+          razorpaySignature: razorpay_signature,
+        },
+      }),
+      prisma.orderStatusHistory.create({
+        data: {
+          orderId,
+          status: 'CONFIRMED',
+          title: 'Payment Verified',
+          description: `Payment of verified successfully via Razorpay (Payment ID: ${razorpay_payment_id}).`,
+        },
+      }),
+    ]);
+
+    const updatedOrder = await prisma.order.findUnique({
       where: { id: orderId },
-      data: {
-        paymentStatus: 'PAID',
-        orderStatus: 'CONFIRMED',
-        razorpayPaymentId: razorpay_payment_id,
-      },
+      include: { items: true, payments: true, statusHistory: true },
     });
 
     return NextResponse.json({
       success: true,
+      message: 'Payment verified successfully.',
       order: updatedOrder,
     });
   } catch (error: any) {
-    console.error('Error verifying payment:', error);
+    console.error('Error verifying razorpay payment:', error);
     return NextResponse.json(
       { success: false, message: 'Server error verifying payment.' },
       { status: 500 }

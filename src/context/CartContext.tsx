@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { CartItem, Product, Coupon } from '@/types';
 import { trackAddToCart, trackRemoveFromCart } from '@/lib/analytics';
 
@@ -9,10 +9,11 @@ interface CartContextType {
   isOpen: boolean;
   openCart: () => void;
   closeCart: () => void;
-  addItem: (product: Product, quantity?: number) => void;
-  removeItem: (id: string) => void;
-  updateQuantity: (id: string, quantity: number) => void;
-  clearCart: () => void;
+  addItem: (product: Product, quantity?: number) => Promise<void>;
+  removeItem: (id: string) => Promise<void>;
+  updateQuantity: (id: string, quantity: number) => Promise<void>;
+  clearCart: () => Promise<void>;
+  refreshCart: () => Promise<void>;
   itemCount: number;
   subtotal: number;
   discount: number;
@@ -25,6 +26,7 @@ interface CartContextType {
   removeCoupon: () => void;
   orderNotes: string;
   setOrderNotes: (notes: string) => void;
+  isLoading: boolean;
 }
 
 const FREE_SHIPPING_THRESHOLD = 999;
@@ -37,87 +39,84 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [orderNotes, setOrderNotes] = useState('');
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Load from localStorage on mount
-  useEffect(() => {
+  const fetchServerCart = useCallback(async () => {
     try {
-      const savedCart = localStorage.getItem('velyra_cart');
-      const savedCoupon = localStorage.getItem('velyra_coupon');
-      if (savedCart) {
-        setItems(JSON.parse(savedCart));
-      }
-      if (savedCoupon) {
-        setAppliedCoupon(JSON.parse(savedCoupon));
+      setIsLoading(true);
+      const res = await fetch('/api/cart', { cache: 'no-store' });
+      const data = await res.json();
+      if (data.success && data.cart) {
+        const mappedItems: CartItem[] = (data.cart.items || []).map((ci: any) => ({
+          id: ci.id,
+          productId: ci.productId,
+          name: ci.product.name,
+          price: ci.product.price,
+          mrp: ci.product.mrp,
+          quantity: ci.quantity,
+          image: ci.product.image,
+          slug: ci.product.slug,
+          volume: ci.product.volume,
+        }));
+        setItems(mappedItems);
       }
     } catch (e) {
-      console.error('Failed to load cart from storage', e);
+      console.error('Failed to load cart from server', e);
     } finally {
-      setIsInitialized(true);
+      setIsLoading(false);
     }
   }, []);
 
-  // Save to localStorage
   useEffect(() => {
-    if (!isInitialized) return;
-    try {
-      localStorage.setItem('velyra_cart', JSON.stringify(items));
-    } catch (e) {
-      console.error('Failed to save cart', e);
-    }
-  }, [items, isInitialized]);
+    fetchServerCart();
 
-  useEffect(() => {
-    if (!isInitialized) return;
-    try {
-      if (appliedCoupon) {
-        localStorage.setItem('velyra_coupon', JSON.stringify(appliedCoupon));
-      } else {
-        localStorage.removeItem('velyra_coupon');
-      }
-    } catch (e) {
-      console.error('Failed to save coupon', e);
-    }
-  }, [appliedCoupon, isInitialized]);
+    const handleAuthChange = () => {
+      fetchServerCart();
+    };
+
+    window.addEventListener('auth:login', handleAuthChange);
+    window.addEventListener('auth:logout', handleAuthChange);
+
+    return () => {
+      window.removeEventListener('auth:login', handleAuthChange);
+      window.removeEventListener('auth:logout', handleAuthChange);
+    };
+  }, [fetchServerCart]);
 
   const openCart = () => setIsOpen(true);
   const closeCart = () => setIsOpen(false);
 
-  const addItem = (product: Product, quantity = 1) => {
+  const addItem = async (product: Product, quantity = 1) => {
     if (product.isUpcoming || !product.inStock) return;
 
+    // Optimistic local update
     setItems((prev) => {
       const existing = prev.find((item) => item.productId === product.id);
-      let newItems: CartItem[];
-
       if (existing) {
-        newItems = prev.map((item) =>
+        return prev.map((item) =>
           item.productId === product.id
             ? { ...item, quantity: item.quantity + quantity }
             : item
         );
-      } else {
-        const image = product.images && product.images.length > 0 ? product.images[0] : '/products/sunscreen-hero.webp';
-        newItems = [
-          ...prev,
-          {
-            id: product.id,
-            productId: product.id,
-            name: product.name,
-            slug: product.slug,
-            price: product.price,
-            mrp: product.mrp,
-            quantity: quantity,
-            image: image,
-            volume: product.volume,
-            sku: product.sku,
-            inStock: product.inStock,
-          },
-        ];
       }
-      return newItems;
+      const image = product.images && product.images.length > 0 ? product.images[0] : '/products/sunscreen-hero.webp';
+      return [
+        ...prev,
+        {
+          id: `temp_${Date.now()}`,
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          mrp: product.mrp,
+          quantity,
+          image,
+          slug: product.slug,
+          volume: product.volume,
+        },
+      ];
     });
 
+    setIsOpen(true);
     trackAddToCart({
       id: product.id,
       name: product.name,
@@ -126,71 +125,127 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       category: product.category,
     });
 
-    setIsOpen(true);
+    // Sync with server
+    try {
+      const res = await fetch('/api/cart/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: product.id, quantity }),
+      });
+      const data = await res.json();
+      if (data.success && data.cart) {
+        const mappedItems: CartItem[] = (data.cart.items || []).map((ci: any) => ({
+          id: ci.id,
+          productId: ci.productId,
+          name: ci.product.name,
+          price: ci.product.price,
+          mrp: ci.product.mrp,
+          quantity: ci.quantity,
+          image: ci.product.image,
+          slug: ci.product.slug,
+          volume: ci.product.volume,
+        }));
+        setItems(mappedItems);
+      }
+    } catch (e) {
+      console.error('Error syncing add item to cart:', e);
+      fetchServerCart();
+    }
   };
 
-  const removeItem = (id: string) => {
-    const itemToRemove = items.find((item) => item.id === id);
+  const removeItem = async (id: string) => {
+    const itemToRemove = items.find((item) => item.id === id || item.productId === id);
     if (itemToRemove) {
       trackRemoveFromCart({
-        id: itemToRemove.id,
+        id: itemToRemove.productId,
         name: itemToRemove.name,
         price: itemToRemove.price,
         quantity: itemToRemove.quantity,
       });
     }
-    setItems((prev) => prev.filter((item) => item.id !== id));
-  };
 
-  const updateQuantity = (id: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeItem(id);
-      return;
-    }
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, quantity } : item))
-    );
-  };
-
-  const clearCart = () => {
-    setItems([]);
-    setAppliedCoupon(null);
-    setOrderNotes('');
-  };
-
-  const applyCoupon = async (code: string): Promise<{ success: boolean; message: string }> => {
-    const trimmedCode = code.trim().toUpperCase();
-    if (!trimmedCode) {
-      return { success: false, message: 'Please enter a coupon code.' };
-    }
+    setItems((prev) => prev.filter((item) => item.id !== id && item.productId !== id));
 
     try {
-      const res = await fetch('/api/coupons/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: trimmedCode, subtotal }),
+      const targetId = itemToRemove?.id || id;
+      const res = await fetch(`/api/cart/items/${targetId}`, {
+        method: 'DELETE',
       });
-
       const data = await res.json();
-      if (!res.ok || !data.valid) {
-        return { success: false, message: data.message || 'Invalid coupon code.' };
+      if (data.success && data.cart) {
+        const mappedItems: CartItem[] = (data.cart.items || []).map((ci: any) => ({
+          id: ci.id,
+          productId: ci.productId,
+          name: ci.product.name,
+          price: ci.product.price,
+          mrp: ci.product.mrp,
+          quantity: ci.quantity,
+          image: ci.product.image,
+          slug: ci.product.slug,
+          volume: ci.product.volume,
+        }));
+        setItems(mappedItems);
       }
-
-      setAppliedCoupon(data.coupon);
-      return { success: true, message: `Coupon ${trimmedCode} applied successfully!` };
     } catch (e) {
-      return { success: false, message: 'Network error validating coupon.' };
+      console.error('Error removing item from cart:', e);
+      fetchServerCart();
     }
   };
 
-  const removeCoupon = () => {
-    setAppliedCoupon(null);
+  const updateQuantity = async (id: string, quantity: number) => {
+    if (quantity <= 0) {
+      await removeItem(id);
+      return;
+    }
+
+    setItems((prev) =>
+      prev.map((item) =>
+        item.id === id || item.productId === id ? { ...item, quantity } : item
+      )
+    );
+
+    try {
+      const targetItem = items.find((i) => i.id === id || i.productId === id);
+      const targetId = targetItem?.id || id;
+      const res = await fetch(`/api/cart/items/${targetId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantity }),
+      });
+      const data = await res.json();
+      if (data.success && data.cart) {
+        const mappedItems: CartItem[] = (data.cart.items || []).map((ci: any) => ({
+          id: ci.id,
+          productId: ci.productId,
+          name: ci.product.name,
+          price: ci.product.price,
+          mrp: ci.product.mrp,
+          quantity: ci.quantity,
+          image: ci.product.image,
+          slug: ci.product.slug,
+          volume: ci.product.volume,
+        }));
+        setItems(mappedItems);
+      }
+    } catch (e) {
+      console.error('Error updating quantity:', e);
+      fetchServerCart();
+    }
   };
 
-  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const clearCart = async () => {
+    setItems([]);
+    setAppliedCoupon(null);
+    try {
+      await fetch('/api/cart', { method: 'DELETE' });
+    } catch (e) {
+      console.error('Error clearing cart:', e);
+    }
+  };
 
-  // Calculate discount
+  const itemCount = items.reduce((acc, item) => acc + item.quantity, 0);
+  const subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
+
   let discount = 0;
   if (appliedCoupon) {
     if (appliedCoupon.discountType === 'PERCENTAGE') {
@@ -200,14 +255,32 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Shipping
   const shippingFee = subtotal === 0 || subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : STANDARD_SHIPPING_FEE;
   const total = Math.max(0, subtotal - discount + shippingFee);
 
-  const progressToFreeShipping = Math.min(
-    100,
-    Math.round((subtotal / FREE_SHIPPING_THRESHOLD) * 100)
-  );
+  const progressToFreeShipping = Math.min(100, (subtotal / FREE_SHIPPING_THRESHOLD) * 100);
+
+  const applyCoupon = async (code: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const res = await fetch('/api/coupons/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, subtotal }),
+      });
+      const data = await res.json();
+      if (data.success && data.coupon) {
+        setAppliedCoupon(data.coupon);
+        return { success: true, message: `Coupon ${code} applied successfully!` };
+      }
+      return { success: false, message: data.message || 'Invalid coupon code.' };
+    } catch {
+      return { success: false, message: 'Failed to apply coupon.' };
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+  };
 
   return (
     <CartContext.Provider
@@ -220,6 +293,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         removeItem,
         updateQuantity,
         clearCart,
+        refreshCart: fetchServerCart,
         itemCount,
         subtotal,
         discount,
@@ -232,6 +306,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         removeCoupon,
         orderNotes,
         setOrderNotes,
+        isLoading,
       }}
     >
       {children}

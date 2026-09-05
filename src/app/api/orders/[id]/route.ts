@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { getAuthenticatedUser } from '@/lib/auth';
+import { getUserOrderById, getOrderForTracking } from '@/lib/orders';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: Request,
@@ -7,33 +10,38 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const query = id.trim();
+    const user = await getAuthenticatedUser(request);
 
-    // Query by orderNumber or id or customerPhone
-    const order = await prisma.order.findFirst({
-      where: {
-        OR: [
-          { orderNumber: { equals: query } },
-          { id: { equals: query } },
-          { customerPhone: { equals: query } },
-        ],
-      },
-      include: {
-        items: true,
-      },
-    });
+    let order = null;
+
+    if (user) {
+      // Authenticated user querying order: strictly isolate by userId
+      order = await getUserOrderById(id, user.id);
+      if (!order && user.role === 'ADMIN') {
+        // Admin fallback if viewing order directly
+        order = await getOrderForTracking(id);
+      }
+    } else {
+      // Guest tracking lookup: allow query by orderNumber or customerPhone
+      order = await getOrderForTracking(id);
+    }
 
     if (!order) {
       return NextResponse.json(
-        { success: false, message: 'Order not found.' },
+        { success: false, message: 'Order not found or unauthorized.' },
         { status: 404 }
       );
     }
 
-    const shippingAddress =
-      typeof order.shippingAddress === 'string'
-        ? JSON.parse(order.shippingAddress)
-        : order.shippingAddress;
+    let shippingAddress = {};
+    try {
+      shippingAddress =
+        typeof order.shippingAddress === 'string'
+          ? JSON.parse(order.shippingAddress)
+          : order.shippingAddress;
+    } catch {
+      shippingAddress = order.shippingAddress;
+    }
 
     return NextResponse.json({
       success: true,

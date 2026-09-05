@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, Lock, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, Lock, ArrowRight, CheckCircle2, MapPin, Plus, Loader2, AlertCircle } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
 import { PaymentMethodSelector } from './PaymentMethodSelector';
 import { trackBeginCheckout, trackPurchase } from '@/lib/analytics';
 import confetti from 'canvas-confetti';
@@ -14,19 +15,38 @@ declare global {
   }
 }
 
+interface SavedAddress {
+  id: string;
+  fullName: string;
+  phone: string;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  addressType: string;
+  isDefault: boolean;
+}
+
 export function CheckoutForm() {
   const router = useRouter();
   const { items, subtotal, discount, shippingFee, total, appliedCoupon, clearCart } = useCart();
+  const { user } = useAuth();
+
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | 'NEW'>('NEW');
+  const [saveAddressToAccount, setSaveAddressToAccount] = useState(true);
 
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
     phone: '',
-    address: '',
-    apartment: '',
+    addressLine1: '',
+    addressLine2: '',
     city: '',
     state: '',
-    pincode: '',
+    postalCode: '',
   });
 
   const [paymentMethod, setPaymentMethod] = useState<'ONLINE' | 'COD'>('ONLINE');
@@ -42,22 +62,83 @@ export function CheckoutForm() {
     'Delhi NCR', 'Jammu & Kashmir', 'Chandigarh'
   ];
 
+  // Autofill user credentials & fetch saved addresses
+  useEffect(() => {
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        fullName: prev.fullName || user.name || '',
+        email: prev.email || user.email || '',
+        phone: prev.phone || user.phone || '',
+      }));
+
+      fetch('/api/addresses')
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.addresses.length > 0) {
+            setSavedAddresses(data.addresses);
+            const defaultAddr = data.addresses.find((a: SavedAddress) => a.isDefault) || data.addresses[0];
+            setSelectedAddressId(defaultAddr.id);
+            setFormData((prev) => ({
+              ...prev,
+              fullName: defaultAddr.fullName,
+              phone: defaultAddr.phone,
+              addressLine1: defaultAddr.addressLine1,
+              addressLine2: defaultAddr.addressLine2 || '',
+              city: defaultAddr.city,
+              state: defaultAddr.state,
+              postalCode: defaultAddr.postalCode,
+            }));
+          }
+        })
+        .catch(console.error);
+    }
+  }, [user]);
+
+  const handleSelectSavedAddress = (addr: SavedAddress) => {
+    setSelectedAddressId(addr.id);
+    setFormData({
+      fullName: addr.fullName,
+      email: formData.email || user?.email || '',
+      phone: addr.phone,
+      addressLine1: addr.addressLine1,
+      addressLine2: addr.addressLine2 || '',
+      city: addr.city,
+      state: addr.state,
+      postalCode: addr.postalCode,
+    });
+  };
+
+  const handleChooseNewAddress = () => {
+    setSelectedAddressId('NEW');
+    setFormData({
+      fullName: user?.name || '',
+      email: user?.email || '',
+      phone: user?.phone || '',
+      addressLine1: '',
+      addressLine2: '',
+      city: '',
+      state: '',
+      postalCode: '',
+    });
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handlePincodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, '').slice(0, 6);
-    setFormData({ ...formData, pincode: val });
+    setFormData({ ...formData, postalCode: val });
 
-    // Automatic State approximation heuristic
+    // State auto-detect heuristic
     if (val.length === 6) {
-      const firstDigit = val[0];
-      if (firstDigit === '1') setFormData(prev => ({ ...prev, pincode: val, state: 'Delhi NCR' }));
-      else if (firstDigit === '4') setFormData(prev => ({ ...prev, pincode: val, state: 'Maharashtra' }));
-      else if (firstDigit === '5') setFormData(prev => ({ ...prev, pincode: val, state: 'Karnataka' }));
-      else if (firstDigit === '6') setFormData(prev => ({ ...prev, pincode: val, state: 'Tamil Nadu' }));
-      else if (firstDigit === '7') setFormData(prev => ({ ...prev, pincode: val, state: 'West Bengal' }));
+      const first = val[0];
+      if (first === '1') setFormData(prev => ({ ...prev, postalCode: val, state: 'Delhi NCR' }));
+      else if (first === '4') setFormData(prev => ({ ...prev, postalCode: val, state: 'Maharashtra' }));
+      else if (first === '5') setFormData(prev => ({ ...prev, postalCode: val, state: 'Karnataka' }));
+      else if (first === '6') setFormData(prev => ({ ...prev, postalCode: val, state: 'Tamil Nadu' }));
+      else if (first === '7') setFormData(prev => ({ ...prev, postalCode: val, state: 'West Bengal' }));
     }
   };
 
@@ -66,27 +147,43 @@ export function CheckoutForm() {
     setErrorMsg(null);
 
     // Validation
-    if (!formData.fullName.trim() || !formData.phone.trim() || !formData.email.trim() || !formData.address.trim() || !formData.city.trim() || !formData.pincode.trim()) {
+    if (!formData.fullName.trim() || !formData.phone.trim() || !formData.email.trim() || !formData.addressLine1.trim() || !formData.city.trim() || !formData.postalCode.trim()) {
       setErrorMsg('Please complete all required delivery fields.');
       return;
     }
 
-    if (!/^\d{10}$/.test(formData.phone.trim())) {
+    if (!/^\d{10}$/.test(formData.phone.trim().replace(/\D/g, '').slice(-10))) {
       setErrorMsg('Please enter a valid 10-digit Indian mobile number.');
       return;
     }
 
-    if (!/^\d{6}$/.test(formData.pincode.trim())) {
+    if (!/^\d{6}$/.test(formData.postalCode.trim())) {
       setErrorMsg('Please enter a valid 6-digit Indian PIN code.');
+      return;
+    }
+
+    if (!items || items.length === 0) {
+      setErrorMsg('Your cart is empty. Please add formulations before checkout.');
       return;
     }
 
     setLoading(true);
     trackBeginCheckout(items, total);
 
+    const shippingPayload = {
+      fullName: formData.fullName,
+      phone: formData.phone,
+      addressLine1: formData.addressLine1,
+      addressLine2: formData.addressLine2,
+      city: formData.city,
+      state: formData.state || 'India',
+      postalCode: formData.postalCode,
+      country: 'India',
+    };
+
     try {
       if (paymentMethod === 'COD') {
-        // Handle Cash on Delivery
+        // Cash on Delivery Transaction
         const res = await fetch('/api/checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -94,22 +191,14 @@ export function CheckoutForm() {
             customerName: formData.fullName,
             customerEmail: formData.email,
             customerPhone: formData.phone,
-            shippingAddress: {
-              address: formData.address,
-              apartment: formData.apartment,
-              city: formData.city,
-              state: formData.state || 'India',
-              pincode: formData.pincode,
-            },
+            shippingAddress: shippingPayload,
             paymentMethod: 'COD',
             items: items.map(i => ({
               productId: i.productId,
-              productName: i.name,
               quantity: i.quantity,
-              price: i.price,
-              volume: i.volume,
             })),
             couponCode: appliedCoupon?.code || null,
+            saveAddressToAccount: user ? saveAddressToAccount : false,
           }),
         });
 
@@ -118,54 +207,59 @@ export function CheckoutForm() {
           throw new Error(data.message || 'Failed to place COD order.');
         }
 
-        trackPurchase({
-          orderNumber: data.order.orderNumber,
-          total: data.order.total,
-          shipping: data.order.shippingFee,
-          items: data.order.items,
-          paymentMethod: 'COD',
-        });
+        try {
+          confetti({
+            particleCount: 80,
+            spread: 60,
+            origin: { y: 0.6 },
+          });
+        } catch {}
 
-        clearCart();
+        await clearCart();
         router.push(`/order-success?orderId=${data.order.id}&orderNumber=${data.order.orderNumber}`);
       } else {
-        // Online Payment Flow (Razorpay / Secure Online Gateway)
+        // Online Payment Flow via Razorpay
         const orderRes = await fetch('/api/razorpay/create-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            amount: total,
             customerName: formData.fullName,
             customerEmail: formData.email,
             customerPhone: formData.phone,
-            shippingAddress: formData,
-            items,
+            shippingAddress: shippingPayload,
+            items: items.map(i => ({
+              productId: i.productId,
+              quantity: i.quantity,
+            })),
             couponCode: appliedCoupon?.code || null,
           }),
         });
 
         const orderData = await orderRes.json();
         if (!orderRes.ok || !orderData.success) {
-          throw new Error(orderData.message || 'Error initializing secure payment gateway.');
+          throw new Error(orderData.message || 'Error initializing payment gateway.');
         }
 
-        // If in test simulation mode (or Razorpay script load fallback)
+        // Test simulation / fallback if Razorpay script is not loaded
         if (orderData.isSimulation || !window.Razorpay) {
-          // Direct verified order flow
-          trackPurchase({
-            orderNumber: orderData.order.orderNumber,
-            total: orderData.order.total,
-            shipping: orderData.order.shippingFee,
-            items: orderData.order.items,
-            paymentMethod: 'ONLINE',
+          const verifyRes = await fetch('/api/razorpay/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orderId: orderData.order.id,
+              razorpay_order_id: orderData.razorpayOrder?.id || `sim_${Date.now()}`,
+              razorpay_payment_id: `pay_sim_${Date.now()}`,
+              razorpay_signature: 'simulated_valid_test_signature_2026',
+            }),
           });
 
-          clearCart();
+          await verifyRes.json();
+          await clearCart();
           router.push(`/order-success?orderId=${orderData.order.id}&orderNumber=${orderData.order.orderNumber}`);
           return;
         }
 
-        // Initialize Razorpay SDK checkout modal
+        // Live Razorpay SDK Modal
         const options = {
           key: orderData.keyId,
           amount: orderData.razorpayOrder.amount,
@@ -175,23 +269,27 @@ export function CheckoutForm() {
           image: '/brand/logo-icon.svg',
           order_id: orderData.razorpayOrder.id,
           handler: async function (response: any) {
-            const verifyRes = await fetch('/api/razorpay/verify', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                orderId: orderData.order.id,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature,
-              }),
-            });
+            try {
+              const verifyRes = await fetch('/api/razorpay/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  orderId: orderData.order.id,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                }),
+              });
 
-            const verifyData = await verifyRes.json();
-            if (verifyData.success) {
-              clearCart();
-              router.push(`/order-success?orderId=${orderData.order.id}&orderNumber=${orderData.order.orderNumber}`);
-            } else {
-              setErrorMsg('Payment verification failed. Please contact support.');
+              const verifyData = await verifyRes.json();
+              if (verifyData.success) {
+                await clearCart();
+                router.push(`/order-success?orderId=${orderData.order.id}&orderNumber=${orderData.order.orderNumber}`);
+              } else {
+                setErrorMsg('Payment verification failed. Please contact concierge support.');
+              }
+            } catch {
+              setErrorMsg('Error verifying payment signature.');
             }
           },
           prefill: {
@@ -200,208 +298,314 @@ export function CheckoutForm() {
             contact: formData.phone,
           },
           theme: {
-            color: '#1A1918',
+            color: '#1A1817',
           },
         };
 
         const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', function (resp: any) {
+          setErrorMsg(resp.error?.description || 'Payment was declined. Please retry or choose Cash on Delivery.');
+          setLoading(false);
+        });
         rzp.open();
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'An error occurred during checkout. Please try again.');
-    } finally {
+      console.error('Checkout error:', err);
+      setErrorMsg(err.message || 'An error occurred during checkout.');
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
-      {/* Step 1: Customer Contact */}
-      <div className="bg-surface-elevated p-6 sm:p-8 rounded-sm border border-border-subtle shadow-sm space-y-5">
-        <h3 className="font-serif text-xl text-brand-charcoal font-medium border-b border-border-subtle pb-3">
-          1. Contact Information
-        </h3>
+    <form onSubmit={handleSubmit} className="space-y-8 text-xs sm:text-sm">
+      {/* Error Banner */}
+      {errorMsg && (
+        <div className="flex items-center gap-2.5 p-4 bg-red-50/90 border border-red-200 text-red-700 text-xs rounded-xs animate-fade-in">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {/* 1. Customer Contact */}
+      <section className="bg-surface-elevated border border-border-subtle p-6 sm:p-8 rounded-sm space-y-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
+        <div className="flex items-center justify-between border-b border-border-subtle pb-3">
+          <div className="flex items-center gap-2.5">
+            <span className="w-5 h-5 rounded-full bg-brand-charcoal text-white text-[10px] font-bold flex items-center justify-center">
+              1
+            </span>
+            <h2 className="font-serif text-lg font-medium text-brand-charcoal">
+              Contact Information
+            </h2>
+          </div>
+          {user ? (
+            <span className="text-[11px] text-brand-amber font-semibold uppercase tracking-wider">
+              Signed in as {user.email}
+            </span>
+          ) : (
+            <span className="text-[11px] text-foreground/50">
+              Guest Checkout
+            </span>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <label className="text-xs uppercase tracking-wider text-brand-mineral font-semibold">
-              Full Name *
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-brand-charcoal/70">
+              Email Address *
             </label>
             <input
-              type="text"
-              name="fullName"
+              type="email"
+              name="email"
               required
-              placeholder="e.g. Priya Sundaram"
-              value={formData.fullName}
+              value={formData.email}
               onChange={handleInputChange}
-              className="w-full bg-surface-muted border border-border-subtle px-3.5 py-2.5 text-xs text-brand-charcoal placeholder:text-brand-mineral focus:outline-none focus:border-brand-charcoal rounded-xs"
+              placeholder="name@example.com"
+              className="w-full px-3.5 py-2.5 bg-surface-base border border-border-strong rounded-xs focus:outline-none focus:border-brand-charcoal text-xs sm:text-sm"
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs uppercase tracking-wider text-brand-mineral font-semibold">
-              Mobile Number (For Delivery Updates) *
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-brand-charcoal/70">
+              Mobile Phone (For Order Tracking SMS) *
             </label>
             <div className="flex">
-              <span className="bg-surface-muted border border-r-0 border-border-subtle px-3 py-2.5 text-xs text-brand-charcoal font-semibold rounded-l-xs flex items-center">
+              <span className="inline-flex items-center px-3 bg-surface-muted border border-r-0 border-border-strong rounded-l-xs text-xs text-foreground/60 font-medium">
                 +91
               </span>
               <input
                 type="tel"
                 name="phone"
                 required
-                maxLength={10}
-                placeholder="9876543210"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
-                className="flex-1 bg-surface-muted border border-border-subtle px-3.5 py-2.5 text-xs text-brand-charcoal placeholder:text-brand-mineral focus:outline-none focus:border-brand-charcoal rounded-r-xs"
+                onChange={handleInputChange}
+                placeholder="9876543210"
+                className="w-full px-3.5 py-2.5 bg-surface-base border border-border-strong rounded-r-xs focus:outline-none focus:border-brand-charcoal text-xs sm:text-sm"
               />
             </div>
           </div>
-
-          <div className="sm:col-span-2 space-y-1">
-            <label className="text-xs uppercase tracking-wider text-brand-mineral font-semibold">
-              Email Address (For Invoice & Order Receipt) *
-            </label>
-            <input
-              type="email"
-              name="email"
-              required
-              placeholder="priya@example.com"
-              value={formData.email}
-              onChange={handleInputChange}
-              className="w-full bg-surface-muted border border-border-subtle px-3.5 py-2.5 text-xs text-brand-charcoal placeholder:text-brand-mineral focus:outline-none focus:border-brand-charcoal rounded-xs"
-            />
-          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Step 2: Shipping Address */}
-      <div className="bg-surface-elevated p-6 sm:p-8 rounded-sm border border-border-subtle shadow-sm space-y-5">
-        <h3 className="font-serif text-xl text-brand-charcoal font-medium border-b border-border-subtle pb-3">
-          2. Shipping Address (India)
-        </h3>
+      {/* 2. Delivery Address */}
+      <section className="bg-surface-elevated border border-border-subtle p-6 sm:p-8 rounded-sm space-y-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
+        <div className="flex items-center justify-between border-b border-border-subtle pb-3">
+          <div className="flex items-center gap-2.5">
+            <span className="w-5 h-5 rounded-full bg-brand-charcoal text-white text-[10px] font-bold flex items-center justify-center">
+              2
+            </span>
+            <h2 className="font-serif text-lg font-medium text-brand-charcoal">
+              Shipping Destination
+            </h2>
+          </div>
+          <span className="text-[11px] text-foreground/50">Complimentary Over ₹999</span>
+        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="sm:col-span-2 space-y-1">
-            <label className="text-xs uppercase tracking-wider text-brand-mineral font-semibold">
-              Flat, House No., Building, Street Address *
+        {/* Saved Addresses Picker for Logged-In User */}
+        {user && savedAddresses.length > 0 && (
+          <div className="space-y-3 pb-2 border-b border-border-subtle">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-brand-charcoal/70">
+              Select a Saved Address
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {savedAddresses.map((addr) => (
+                <div
+                  key={addr.id}
+                  onClick={() => handleSelectSavedAddress(addr)}
+                  className={`p-3.5 border rounded-xs cursor-pointer transition-all ${
+                    selectedAddressId === addr.id
+                      ? 'border-brand-charcoal bg-brand-sand/15 shadow-xs'
+                      : 'border-border-strong hover:border-brand-charcoal/40 bg-surface-base'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-semibold text-xs text-brand-charcoal">{addr.fullName}</span>
+                    <span className="text-[10px] uppercase font-bold text-foreground/50">{addr.addressType}</span>
+                  </div>
+                  <p className="text-[11px] text-foreground/70 truncate">{addr.addressLine1}</p>
+                  <p className="text-[11px] text-foreground/70">{addr.city}, {addr.state} — {addr.postalCode}</p>
+                </div>
+              ))}
+
+              <div
+                onClick={handleChooseNewAddress}
+                className={`p-3.5 border border-dashed rounded-xs cursor-pointer flex items-center justify-center gap-2 text-xs font-medium transition-colors ${
+                  selectedAddressId === 'NEW'
+                    ? 'border-brand-charcoal bg-brand-sand/15 text-brand-charcoal'
+                    : 'border-border-strong text-foreground/60 hover:text-brand-charcoal'
+                }`}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Enter New Address</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Address Input Fields */}
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-brand-charcoal/70">
+              Recipient Full Name *
             </label>
             <input
               type="text"
-              name="address"
+              name="fullName"
               required
-              placeholder="e.g. 402, Lotus Grandeur, Veera Desai Road"
-              value={formData.address}
+              value={formData.fullName}
               onChange={handleInputChange}
-              className="w-full bg-surface-muted border border-border-subtle px-3.5 py-2.5 text-xs text-brand-charcoal placeholder:text-brand-mineral focus:outline-none focus:border-brand-charcoal rounded-xs"
+              placeholder="e.g. Aarav Sharma"
+              className="w-full px-3.5 py-2.5 bg-surface-base border border-border-strong rounded-xs focus:outline-none focus:border-brand-charcoal text-xs sm:text-sm"
             />
           </div>
 
-          <div className="sm:col-span-2 space-y-1">
-            <label className="text-xs uppercase tracking-wider text-brand-mineral font-semibold">
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-brand-charcoal/70">
+              Address (House / Flat No., Street, Building) *
+            </label>
+            <input
+              type="text"
+              name="addressLine1"
+              required
+              value={formData.addressLine1}
+              onChange={handleInputChange}
+              placeholder="Flat 402, Lotus Towers, 14th Main"
+              className="w-full px-3.5 py-2.5 bg-surface-base border border-border-strong rounded-xs focus:outline-none focus:border-brand-charcoal text-xs sm:text-sm"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-brand-charcoal/70">
               Apartment, Suite, Landmark (Optional)
             </label>
             <input
               type="text"
-              name="apartment"
-              placeholder="e.g. Near Country Club, Andheri West"
-              value={formData.apartment}
+              name="addressLine2"
+              value={formData.addressLine2}
               onChange={handleInputChange}
-              className="w-full bg-surface-muted border border-border-subtle px-3.5 py-2.5 text-xs text-brand-charcoal placeholder:text-brand-mineral focus:outline-none focus:border-brand-charcoal rounded-xs"
+              placeholder="Near Indiranagar Metro Station"
+              className="w-full px-3.5 py-2.5 bg-surface-base border border-border-strong rounded-xs focus:outline-none focus:border-brand-charcoal text-xs sm:text-sm"
             />
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs uppercase tracking-wider text-brand-mineral font-semibold">
-              PIN Code (6 digits) *
-            </label>
-            <input
-              type="text"
-              name="pincode"
-              required
-              maxLength={6}
-              placeholder="400053"
-              value={formData.pincode}
-              onChange={handlePincodeChange}
-              className="w-full bg-surface-muted border border-border-subtle px-3.5 py-2.5 text-xs text-brand-charcoal placeholder:text-brand-mineral focus:outline-none focus:border-brand-charcoal rounded-xs"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-brand-charcoal/70">
+                PIN Code *
+              </label>
+              <input
+                type="text"
+                name="postalCode"
+                required
+                value={formData.postalCode}
+                onChange={handlePincodeChange}
+                placeholder="6 digits"
+                maxLength={6}
+                className="w-full px-3.5 py-2.5 bg-surface-base border border-border-strong rounded-xs focus:outline-none focus:border-brand-charcoal text-xs sm:text-sm font-mono"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-brand-charcoal/70">
+                City *
+              </label>
+              <input
+                type="text"
+                name="city"
+                required
+                value={formData.city}
+                onChange={handleInputChange}
+                placeholder="Bengaluru"
+                className="w-full px-3.5 py-2.5 bg-surface-base border border-border-strong rounded-xs focus:outline-none focus:border-brand-charcoal text-xs sm:text-sm"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-brand-charcoal/70">
+                State *
+              </label>
+              <select
+                name="state"
+                required
+                value={formData.state}
+                onChange={handleInputChange}
+                className="w-full px-3.5 py-2.5 bg-surface-base border border-border-strong rounded-xs focus:outline-none focus:border-brand-charcoal text-xs sm:text-sm"
+              >
+                <option value="">Select State</option>
+                {indianStates.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs uppercase tracking-wider text-brand-mineral font-semibold">
-              City / District *
-            </label>
-            <input
-              type="text"
-              name="city"
-              required
-              placeholder="e.g. Mumbai"
-              value={formData.city}
-              onChange={handleInputChange}
-              className="w-full bg-surface-muted border border-border-subtle px-3.5 py-2.5 text-xs text-brand-charcoal placeholder:text-brand-mineral focus:outline-none focus:border-brand-charcoal rounded-xs"
-            />
-          </div>
+          {user && selectedAddressId === 'NEW' && (
+            <div className="pt-2">
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-brand-charcoal">
+                <input
+                  type="checkbox"
+                  checked={saveAddressToAccount}
+                  onChange={(e) => setSaveAddressToAccount(e.target.checked)}
+                  className="accent-brand-charcoal"
+                />
+                <span>Save this address to my account for future orders</span>
+              </label>
+            </div>
+          )}
+        </div>
+      </section>
 
-          <div className="sm:col-span-2 space-y-1">
-            <label className="text-xs uppercase tracking-wider text-brand-mineral font-semibold">
-              State / Union Territory *
-            </label>
-            <select
-              name="state"
-              required
-              value={formData.state}
-              onChange={handleInputChange}
-              className="w-full bg-surface-muted border border-border-subtle px-3.5 py-2.5 text-xs text-brand-charcoal focus:outline-none focus:border-brand-charcoal rounded-xs"
-            >
-              <option value="">Select State</option>
-              {indianStates.map((st) => (
-                <option key={st} value={st}>
-                  {st}
-                </option>
-              ))}
-            </select>
+      {/* 3. Payment Method */}
+      <section className="bg-surface-elevated border border-border-subtle p-6 sm:p-8 rounded-sm space-y-5 shadow-[0_2px_12px_rgba(0,0,0,0.02)]">
+        <div className="flex items-center justify-between border-b border-border-subtle pb-3">
+          <div className="flex items-center gap-2.5">
+            <span className="w-5 h-5 rounded-full bg-brand-charcoal text-white text-[10px] font-bold flex items-center justify-center">
+              3
+            </span>
+            <h2 className="font-serif text-lg font-medium text-brand-charcoal">
+              Payment Method
+            </h2>
+          </div>
+          <div className="flex items-center gap-1 text-[11px] text-emerald-700 font-medium">
+            <Lock className="w-3 h-3" />
+            <span>256-Bit TLS Encrypted</span>
           </div>
         </div>
-      </div>
 
-      {/* Step 3: Payment Method */}
-      <div className="bg-surface-elevated p-6 sm:p-8 rounded-sm border border-border-subtle shadow-sm">
         <PaymentMethodSelector
           selectedMethod={paymentMethod}
-          onChange={(m) => setPaymentMethod(m)}
+          onChange={setPaymentMethod}
         />
-      </div>
-
-      {/* Error Notice */}
-      {errorMsg && (
-        <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xs font-medium animate-fade-in">
-          {errorMsg}
-        </div>
-      )}
+      </section>
 
       {/* Submit Button */}
-      <div className="space-y-3">
+      <div className="space-y-3 pt-2">
         <button
           type="submit"
           disabled={loading || items.length === 0}
-          className="w-full bg-brand-charcoal text-white py-4 text-xs uppercase tracking-widest font-semibold hover:bg-brand-mineral transition-all rounded-sm shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+          className="w-full py-4 bg-brand-charcoal text-white rounded-xs text-xs sm:text-sm uppercase tracking-editorial font-medium hover:bg-black transition-all flex items-center justify-center gap-2 shadow-[0_6px_20px_rgba(0,0,0,0.12)] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? (
-            <span>Securing & Placing Order...</span>
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Authorizing & Verifying Order...</span>
+            </>
           ) : (
             <>
-              <span>
-                {paymentMethod === 'COD' ? 'Confirm Cash on Delivery Order' : 'Pay & Confirm Order'}
-              </span>
+              <span>{paymentMethod === 'ONLINE' ? 'Pay Now via Razorpay' : 'Confirm Cash on Delivery Order'}</span>
               <ArrowRight className="w-4 h-4" />
             </>
           )}
         </button>
 
-        <div className="flex items-center justify-center gap-2 text-[11px] text-brand-mineral">
-          <Lock className="w-3.5 h-3.5 text-brand-olive" />
-          <span>256-bit SSL Encrypted Indian E-Commerce Transaction</span>
+        <div className="flex items-center justify-center gap-4 text-[11px] text-foreground/50 pt-2">
+          <span className="flex items-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Authentic Formulations Guaranteed</span>
+          </span>
+          <span>•</span>
+          <span>Hassle-Free 14-Day Returns</span>
         </div>
       </div>
     </form>

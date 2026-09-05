@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
+import { getAuthenticatedUser } from '@/lib/auth';
+import { createOrder } from '@/lib/orders';
 import { prisma } from '@/lib/prisma';
 
-const FREE_SHIPPING_THRESHOLD = 999;
-const STANDARD_SHIPPING_FEE = 70;
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
+    const user = await getAuthenticatedUser(request);
     const body = await request.json();
     const {
       customerName,
@@ -15,109 +17,64 @@ export async function POST(request: Request) {
       paymentMethod,
       items,
       couponCode,
+      notes,
+      saveAddressToAccount,
     } = body;
 
     // Server-side validation
-    if (
-      !customerName ||
-      !customerEmail ||
-      !customerPhone ||
-      !shippingAddress ||
-      !items ||
-      items.length === 0
-    ) {
+    if (!customerName || !customerEmail || !customerPhone || !shippingAddress || !items || items.length === 0) {
       return NextResponse.json(
         { success: false, message: 'Missing required order details.' },
         { status: 400 }
       );
     }
 
-    // Recalculate price server-side from DB
-    let calculatedSubtotal = 0;
-    const validatedItems = [];
-
-    for (const item of items) {
-      const product = await prisma.product.findUnique({
-        where: { id: item.productId },
-      });
-
-      if (!product || !product.inStock) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `Product ${item.productName || 'in cart'} is currently out of stock.`,
-          },
-          { status: 400 }
-        );
-      }
-
-      calculatedSubtotal += product.price * item.quantity;
-      validatedItems.push({
-        productId: product.id,
-        productName: product.name,
-        quantity: item.quantity,
-        price: product.price,
-        volume: product.volume,
-      });
-    }
-
-    // Recalculate discount
-    let discount = 0;
-    if (couponCode) {
-      const coupon = await prisma.coupon.findUnique({
-        where: { code: couponCode.toUpperCase() },
-      });
-      if (coupon && coupon.isActive) {
-        if (!coupon.minOrderValue || calculatedSubtotal >= coupon.minOrderValue) {
-          if (coupon.discountType === 'PERCENTAGE') {
-            discount = Math.round((calculatedSubtotal * coupon.discountValue) / 100);
-          } else {
-            discount = coupon.discountValue;
-          }
-        }
-      }
-    }
-
-    const shippingFee =
-      calculatedSubtotal === 0 || calculatedSubtotal >= FREE_SHIPPING_THRESHOLD
-        ? 0
-        : STANDARD_SHIPPING_FEE;
-    const calculatedTotal = Math.max(0, calculatedSubtotal - discount + shippingFee);
-
-    // Generate human-readable Indian order ID
-    const randomSuffix = Math.floor(10000 + Math.random() * 90000);
-    const orderNumber = `VEL-${randomSuffix}`;
-
-    // Create Order in database
-    const order = await prisma.order.create({
-      data: {
-        orderNumber,
-        customerName,
-        customerEmail,
-        customerPhone,
-        shippingAddress: JSON.stringify(shippingAddress),
-        paymentMethod: paymentMethod || 'COD',
-        paymentStatus: paymentMethod === 'ONLINE' ? 'PAID' : 'PENDING',
-        orderStatus: 'PLACED',
-        subtotal: calculatedSubtotal,
-        discount,
-        shippingFee,
-        total: calculatedTotal,
-        couponCode: couponCode || null,
-        items: {
-          create: validatedItems.map((i) => ({
-            productId: i.productId,
-            productName: i.productName,
-            quantity: i.quantity,
-            price: i.price,
-            volume: i.volume,
-          })),
-        },
-      },
-      include: {
-        items: true,
-      },
+    // Call transactional order creation engine
+    const order = await createOrder({
+      userId: user ? user.id : null,
+      customerName: customerName.trim(),
+      customerEmail: customerEmail.trim().toLowerCase(),
+      customerPhone: customerPhone.trim(),
+      shippingAddress,
+      paymentMethod: paymentMethod === 'ONLINE' ? 'ONLINE' : 'COD',
+      items,
+      couponCode: couponCode ? couponCode.trim() : null,
+      notes: notes ? notes.trim() : null,
     });
+
+    // Optionally save address to user's address book
+    if (user && saveAddressToAccount) {
+      try {
+        const addressExists = await prisma.address.findFirst({
+          where: {
+            userId: user.id,
+            addressLine1: shippingAddress.addressLine1,
+            postalCode: shippingAddress.postalCode,
+          },
+        });
+
+        if (!addressExists) {
+          const count = await prisma.address.count({ where: { userId: user.id } });
+          await prisma.address.create({
+            data: {
+              userId: user.id,
+              fullName: shippingAddress.fullName || customerName,
+              phone: shippingAddress.phone || customerPhone,
+              addressLine1: shippingAddress.addressLine1,
+              addressLine2: shippingAddress.addressLine2 || null,
+              city: shippingAddress.city,
+              state: shippingAddress.state,
+              postalCode: shippingAddress.postalCode,
+              country: shippingAddress.country || 'India',
+              addressType: shippingAddress.addressType || 'HOME',
+              isDefault: count === 0,
+            },
+          });
+        }
+      } catch (err) {
+        console.error('Failed to auto-save address:', err);
+      }
+    }
 
     return NextResponse.json({
       success: true,
@@ -126,15 +83,19 @@ export async function POST(request: Request) {
         orderNumber: order.orderNumber,
         total: order.total,
         subtotal: order.subtotal,
+        discount: order.discount,
         shippingFee: order.shippingFee,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus,
+        orderStatus: order.orderStatus,
         items: order.items,
       },
     });
   } catch (error: any) {
     console.error('Error creating checkout order:', error);
     return NextResponse.json(
-      { success: false, message: 'Server error processing order.' },
-      { status: 500 }
+      { success: false, message: error.message || 'Failed to place order.' },
+      { status: 400 }
     );
   }
 }
