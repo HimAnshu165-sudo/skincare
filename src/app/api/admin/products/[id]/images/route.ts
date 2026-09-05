@@ -6,10 +6,10 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const productId = params.id;
+    const { id: productId } = await params;
     const images = await prisma.productImage.findMany({
       where: { productId },
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
@@ -27,10 +27,10 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const productId = params.id;
+    const { id: productId } = await params;
     const body = await request.json();
     const { imageId, isPrimary, alt, sortOrder, reorderedIds } = body;
 

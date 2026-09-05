@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import {
   Upload,
   ArrowLeft,
@@ -31,12 +32,9 @@ interface ProductDetails {
   slug: string;
 }
 
-export default function ProductImagesManagerPage({
-  params,
-}: {
-  params: { id: string };
-}) {
-  const productId = params.id;
+export default function ProductImagesManagerPage() {
+  const routeParams = useParams();
+  const productId = (routeParams?.id as string) || '';
   const [product, setProduct] = useState<ProductDetails | null>(null);
   const [images, setImages] = useState<ProductImageItem[]>([]);
   const [loading, setLoading] = useState(true);

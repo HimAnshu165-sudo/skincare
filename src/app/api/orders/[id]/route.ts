@@ -3,10 +3,11 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const query = params.id.trim();
+    const { id } = await params;
+    const query = id.trim();
 
     // Query by orderNumber or id or customerPhone
     const order = await prisma.order.findFirst({

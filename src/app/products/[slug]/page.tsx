@@ -12,14 +12,15 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 
 interface PDPProps {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 export const revalidate = 60;
 
 export async function generateMetadata({ params }: PDPProps): Promise<Metadata> {
+  const { slug } = await params;
   const product = await prisma.product.findUnique({
-    where: { slug: params.slug },
+    where: { slug },
   });
 
   if (!product) {
@@ -55,8 +56,9 @@ export async function generateMetadata({ params }: PDPProps): Promise<Metadata> 
 }
 
 export default async function ProductDetailPage({ params }: PDPProps) {
+  const { slug } = await params;
   const rawProduct = await prisma.product.findUnique({
-    where: { slug: params.slug },
+    where: { slug },
     include: {
       productImages: {
         orderBy: { sortOrder: 'asc' },
