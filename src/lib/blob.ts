@@ -54,25 +54,20 @@ export async function uploadToBlob({
   // Ensure sanitized pathname
   const cleanPathname = pathname.replace(/^\/+/, '');
 
-  let blobResult;
-
-  if (isBlobConfigured()) {
-    // Official Vercel Blob upload with public access
-    blobResult = await put(cleanPathname, file, {
-      access: 'public',
-      contentType,
-      addRandomSuffix: false, // Maintain structured pathnames
-    });
-  } else {
-    // Graceful fallback for local development when Vercel token is not yet in .env
-    console.warn('BLOB_READ_WRITE_TOKEN not configured in .env. Falling back to local URL path.');
-    blobResult = {
-      url: `/${cleanPathname}`,
-      pathname: cleanPathname,
-      contentType: contentType || 'image/webp',
-      contentDisposition: 'inline',
-    };
+  if (!isBlobConfigured()) {
+    const error: any = new Error(
+      'BLOB_NOT_CONFIGURED: Vercel Blob storage is not configured. Please define BLOB_READ_WRITE_TOKEN in your environment.'
+    );
+    error.code = 'BLOB_NOT_CONFIGURED';
+    throw error;
   }
+
+  // Official Vercel Blob upload with public access
+  const blobResult = await put(cleanPathname, file, {
+    access: 'public',
+    contentType,
+    addRandomSuffix: false, // Maintain structured pathnames
+  });
 
   // If primary image is being set, reset any existing primary for this product
   if (isPrimary && productId) {

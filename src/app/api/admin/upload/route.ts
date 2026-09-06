@@ -99,6 +99,17 @@ export async function POST(request: Request) {
     }, 201);
   } catch (error: any) {
     console.error('Error in /api/admin/upload:', error);
-    return jsonError(error.message || 'Server error uploading image to Vercel Blob.', 500);
+    if (error?.code === 'BLOB_NOT_CONFIGURED') {
+      return jsonError(
+        'Vercel Blob storage is not configured. Please define BLOB_READ_WRITE_TOKEN in .env to upload assets to the velyra-media store.',
+        503,
+        { code: 'BLOB_NOT_CONFIGURED' }
+      );
+    }
+    return jsonError(
+      error.message || 'Server error uploading image to Vercel Blob store.',
+      500,
+      { code: 'BLOB_UPLOAD_FAILED' }
+    );
   }
 }
