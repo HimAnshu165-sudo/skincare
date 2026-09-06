@@ -123,9 +123,11 @@ function OrderSuccessContent() {
                 Delivering To:
               </strong>
               <p className="text-brand-charcoal font-medium">{order.customerName}</p>
-              <p>{order.shippingAddress.address}</p>
-              {order.shippingAddress.apartment && <p>{order.shippingAddress.apartment}</p>}
-              <p>{order.shippingAddress.city}, {order.shippingAddress.state} - {order.shippingAddress.pincode}</p>
+              <p>{order.shippingAddress?.addressLine1 || order.shippingAddress?.address}</p>
+              {(order.shippingAddress?.addressLine2 || order.shippingAddress?.apartment) && (
+                <p>{order.shippingAddress?.addressLine2 || order.shippingAddress?.apartment}</p>
+              )}
+              <p>{order.shippingAddress?.city}, {order.shippingAddress?.state} - {order.shippingAddress?.postalCode || order.shippingAddress?.pincode}</p>
               <p className="pt-1">Phone: +91 {order.customerPhone}</p>
             </div>
 

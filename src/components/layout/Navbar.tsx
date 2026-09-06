@@ -64,9 +64,11 @@ export function Navbar() {
           {/* Mobile Menu Button */}
           <div className="flex items-center lg:hidden">
             <button
+              type="button"
               onClick={() => setMobileMenuOpen(true)}
               className="p-2 -ml-2 text-brand-charcoal hover:opacity-70 transition-opacity"
               aria-label="Open menu"
+              suppressHydrationWarning
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -104,9 +106,11 @@ export function Navbar() {
           {/* Right Action Icons */}
           <div className="flex items-center gap-3 sm:gap-5">
             <button
+              type="button"
               onClick={() => setSearchOpen(!searchOpen)}
               className="text-brand-charcoal hover:opacity-70 transition-opacity p-1.5"
               aria-label="Search products"
+              suppressHydrationWarning
             >
               <Search className="w-4.5 h-4.5" />
             </button>
@@ -115,9 +119,11 @@ export function Navbar() {
             {user ? (
               <div className="relative" ref={userMenuRef}>
                 <button
+                  type="button"
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center gap-1.5 p-1.5 text-brand-charcoal hover:opacity-70 transition-opacity group"
                   aria-label="User Account"
+                  suppressHydrationWarning
                 >
                   <div className="w-7 h-7 rounded-full bg-brand-sand/60 text-brand-charcoal text-xs font-semibold flex items-center justify-center border border-brand-sand">
                     {user.name ? user.name[0].toUpperCase() : 'U'}
@@ -189,9 +195,11 @@ export function Navbar() {
 
             {/* Shopping Bag Button */}
             <button
+              type="button"
               onClick={openCart}
               className="relative text-brand-charcoal hover:opacity-70 transition-opacity p-1.5 flex items-center gap-1.5 group"
               aria-label="View shopping bag"
+              suppressHydrationWarning
             >
               <ShoppingBag className="w-5 h-5" />
               <span className="hidden sm:inline-block text-xs font-medium tracking-wide uppercase text-brand-charcoal/70 group-hover:text-brand-charcoal">

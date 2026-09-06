@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { uploadToBlob } from '@/lib/blob';
-import { prisma } from '@/lib/prisma';
+import { requireAdminUser } from '@/lib/auth';
+import { jsonError, jsonSuccess } from '@/lib/validation';
+import { logAdminAction } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +18,11 @@ const MAX_FILE_SIZE = 12 * 1024 * 1024; // 12 MB limit
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireAdminUser(request);
+    if (auth.status !== 200 || !auth.user) {
+      return jsonError(auth.error || 'Unauthorized', auth.status);
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
     const folder = (formData.get('folder') as string) || 'products';
@@ -27,29 +34,20 @@ export async function POST(request: Request) {
     const customFilename = (formData.get('filename') as string) || '';
 
     if (!file) {
-      return NextResponse.json(
-        { success: false, message: 'No image file provided.' },
-        { status: 400 }
-      );
+      return jsonError('No image file provided.', 400);
     }
 
     // MIME type check
     if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: `Invalid file type: ${file.type}. Allowed formats: JPEG, PNG, WebP, AVIF, SVG.`,
-        },
-        { status: 400 }
+      return jsonError(
+        `Invalid file type: ${file.type}. Allowed formats: JPEG, PNG, WebP, AVIF, SVG.`,
+        400
       );
     }
 
     // Size check
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { success: false, message: 'File size exceeds maximum allowed limit of 12MB.' },
-        { status: 400 }
-      );
+      return jsonError('File size exceeds maximum allowed limit of 12MB.', 400);
     }
 
     // Clean filename
@@ -84,18 +82,23 @@ export async function POST(request: Request) {
       sortOrder,
     });
 
-    return NextResponse.json({
-      success: true,
+    await logAdminAction({
+      adminUserId: auth.user.id,
+      action: 'MEDIA_UPLOADED',
+      resourceType: 'MEDIA',
+      resourceId: result.pathname,
+      metadata: { url: result.url, size: file.size, type: file.type },
+      request,
+    });
+
+    return jsonSuccess({
       url: result.url,
       pathname: result.pathname,
       contentType: result.contentType,
       image: result.imageRecord,
-    });
+    }, 201);
   } catch (error: any) {
     console.error('Error in /api/admin/upload:', error);
-    return NextResponse.json(
-      { success: false, message: error.message || 'Server error uploading image to Vercel Blob.' },
-      { status: 500 }
-    );
+    return jsonError(error.message || 'Server error uploading image to Vercel Blob.', 500);
   }
 }

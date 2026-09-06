@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getAuthenticatedUser } from '@/lib/auth';
-import { mergeGuestCartIntoUserCart, getOrCreateCart, formatCart } from '@/lib/cart';
 import { cookies } from 'next/headers';
+import { getAuthenticatedUser, clearGuestCookie, GUEST_COOKIE_NAME } from '@/lib/auth';
+import { mergeGuestCartIntoUserCart, getOrCreateCart, formatCart } from '@/lib/cart';
+import { jsonError, jsonSuccess } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,36 +10,38 @@ export async function POST(request: Request) {
   try {
     const user = await getAuthenticatedUser(request);
     if (!user) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+      return jsonError('Unauthorized: Must be signed in to merge cart.', 401);
+    }
+
+    let guestToken: string | null = null;
+
+    try {
+      const body = await request.json();
+      if (body && typeof body.guestToken === 'string') {
+        guestToken = body.guestToken;
+      }
+    } catch {
+      // Body is optional if cookie is present
     }
 
     const cookieStore = await cookies();
-    const guestToken = cookieStore.get('velyra_guest_token')?.value;
+    if (!guestToken) {
+      guestToken = cookieStore.get(GUEST_COOKIE_NAME)?.value || null;
+    }
 
     if (guestToken) {
       await mergeGuestCartIntoUserCart(guestToken, user.id);
-      // Clear guest token cookie
-      cookieStore.set('velyra_guest_token', '', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/',
-        maxAge: 0,
-      });
+      await clearGuestCookie();
     }
 
     const userCart = await getOrCreateCart(user.id);
 
-    return NextResponse.json({
-      success: true,
+    return jsonSuccess({
       cart: formatCart(userCart),
       message: 'Cart merged successfully.',
     });
   } catch (error: any) {
     console.error('Error merging cart:', error);
-    return NextResponse.json(
-      { success: false, message: 'Failed to merge cart.' },
-      { status: 500 }
-    );
+    return jsonError('Failed to merge cart.', 500);
   }
 }

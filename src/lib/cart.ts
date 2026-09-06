@@ -31,13 +31,17 @@ export interface FormattedCart {
  * Helper to extract primary image URL for product.
  */
 function getProductPrimaryImage(product: any): string {
-  if (product.productImages && product.productImages.length > 0) {
+  if (product?.productImages && product.productImages.length > 0) {
     const primary = product.productImages.find((img: any) => img.isPrimary) || product.productImages[0];
     return primary.url;
   }
-  if (product.images) {
-    const images = typeof product.images === 'string' ? JSON.parse(product.images) : product.images;
-    if (images && images.length > 0) return images[0];
+  if (product?.images) {
+    try {
+      const images = typeof product.images === 'string' ? JSON.parse(product.images) : product.images;
+      if (Array.isArray(images) && images.length > 0) return images[0];
+    } catch {
+      // fallback
+    }
   }
   return '/products/sunscreen-hero.webp';
 }
@@ -62,19 +66,21 @@ export function formatCart(cart: any): FormattedCart {
 
   const items: FormattedCartItem[] = (cart.items || []).map((item: any) => {
     const product = item.product;
-    itemCount += item.quantity;
-    subtotal += (product?.price || 0) * item.quantity;
+    const price = product?.price || 0;
+    const qty = Math.max(1, item.quantity || 1);
+    itemCount += qty;
+    subtotal += price * qty;
 
     return {
       id: item.id,
       cartId: item.cartId,
       productId: item.productId,
-      quantity: item.quantity,
+      quantity: qty,
       product: {
         id: product?.id || item.productId,
         name: product?.name || 'Product',
         slug: product?.slug || '',
-        price: product?.price || 0,
+        price,
         mrp: product?.mrp || 0,
         volume: product?.volume || '',
         inStock: product?.inStock ?? true,
@@ -171,6 +177,10 @@ export async function getOrCreateCart(userId?: string | null, guestToken?: strin
  * Add an item to cart with atomic stock validation.
  */
 export async function addItemToCart(cartId: string, productId: string, quantity = 1) {
+  if (quantity <= 0) {
+    throw new Error('Quantity must be greater than zero.');
+  }
+
   const product = await prisma.product.findUnique({
     where: { id: productId },
   });
@@ -210,7 +220,7 @@ export async function addItemToCart(cartId: string, productId: string, quantity 
 }
 
 /**
- * Update item quantity with stock validation.
+ * Update item quantity with stock validation and ownership verification.
  */
 export async function updateCartItemQuantity(cartId: string, cartItemId: string, quantity: number) {
   if (quantity <= 0) {
@@ -223,7 +233,7 @@ export async function updateCartItemQuantity(cartId: string, cartItemId: string,
   });
 
   if (!item) {
-    throw new Error('Cart item not found.');
+    throw new Error('Cart item not found in your cart.');
   }
 
   if (quantity > item.product.stockQuantity) {
@@ -239,7 +249,7 @@ export async function updateCartItemQuantity(cartId: string, cartItemId: string,
 }
 
 /**
- * Remove an item from cart.
+ * Remove an item from cart strictly scoped to the cart.
  */
 export async function removeCartItem(cartId: string, cartItemId: string) {
   await prisma.cartItem.deleteMany({
@@ -282,62 +292,76 @@ export async function getCartById(cartId: string) {
 }
 
 /**
- * Merge guest cart into authenticated customer cart upon login/signup.
+ * Merge guest cart into authenticated customer cart upon login/signup transactionally.
  */
 export async function mergeGuestCartIntoUserCart(guestToken: string, userId: string) {
   if (!guestToken || !userId) return;
 
-  const guestCart = await prisma.cart.findUnique({
-    where: { guestToken },
-    include: { items: true },
-  });
-
-  if (!guestCart || guestCart.items.length === 0) return;
-
-  const userCart = await getOrCreateCart(userId);
-  if (!userCart) return;
-
-  for (const guestItem of guestCart.items) {
-    const product = await prisma.product.findUnique({
-      where: { id: guestItem.productId },
+  // Run in atomic transaction to prevent race conditions during concurrent merges
+  await prisma.$transaction(async (tx) => {
+    const guestCart = await tx.cart.findUnique({
+      where: { guestToken },
+      include: { items: true },
     });
 
-    if (!product || !product.inStock) continue;
+    if (!guestCart || guestCart.items.length === 0) {
+      if (guestCart) {
+        await tx.cart.delete({ where: { id: guestCart.id } }).catch(() => null);
+      }
+      return;
+    }
 
-    const userItem = await prisma.cartItem.findUnique({
-      where: {
-        cartId_productId: {
-          cartId: userCart.id,
-          productId: guestItem.productId,
-        },
-      },
+    let userCart = await tx.cart.findUnique({
+      where: { userId },
     });
 
-    if (userItem) {
-      const mergedQty = Math.min(
-        userItem.quantity + guestItem.quantity,
-        product.stockQuantity
-      );
-      await prisma.cartItem.update({
-        where: { id: userItem.id },
-        data: { quantity: mergedQty },
+    if (!userCart) {
+      userCart = await tx.cart.create({
+        data: { userId },
       });
-    } else {
-      const initialQty = Math.min(guestItem.quantity, product.stockQuantity);
-      if (initialQty > 0) {
-        await prisma.cartItem.create({
-          data: {
+    }
+
+    for (const guestItem of guestCart.items) {
+      const product = await tx.product.findUnique({
+        where: { id: guestItem.productId },
+      });
+
+      if (!product || !product.inStock) continue;
+
+      const userItem = await tx.cartItem.findUnique({
+        where: {
+          cartId_productId: {
             cartId: userCart.id,
             productId: guestItem.productId,
-            quantity: initialQty,
           },
+        },
+      });
+
+      if (userItem) {
+        const mergedQty = Math.min(
+          userItem.quantity + guestItem.quantity,
+          product.stockQuantity
+        );
+        await tx.cartItem.update({
+          where: { id: userItem.id },
+          data: { quantity: mergedQty },
         });
+      } else {
+        const initialQty = Math.min(guestItem.quantity, product.stockQuantity);
+        if (initialQty > 0) {
+          await tx.cartItem.create({
+            data: {
+              cartId: userCart.id,
+              productId: guestItem.productId,
+              quantity: initialQty,
+            },
+          });
+        }
       }
     }
-  }
 
-  // Delete guest cart after successful merge
-  await prisma.cart.delete({
-    where: { id: guestCart.id },
-  }).catch(() => null);
+    // Delete the guest cart and its items after merge
+    await tx.cartItem.deleteMany({ where: { cartId: guestCart.id } });
+    await tx.cart.delete({ where: { id: guestCart.id } });
+  });
 }

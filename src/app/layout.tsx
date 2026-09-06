@@ -84,7 +84,7 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="en" className="bg-surface-base text-brand-charcoal">
+    <html lang="en" className="bg-surface-base text-brand-charcoal" suppressHydrationWarning>
       <head>
         <script
           type="application/ld+json"
@@ -115,7 +115,7 @@ export default function RootLayout({
           </>
         )}
       </head>
-      <body className="min-h-screen flex flex-col font-sans bg-surface-base text-brand-charcoal antialiased selection:bg-brand-sand selection:text-brand-charcoal">
+      <body className="min-h-screen flex flex-col font-sans bg-surface-base text-brand-charcoal antialiased selection:bg-brand-sand selection:text-brand-charcoal" suppressHydrationWarning>
         <AuthProvider>
           <CartProvider>
             <AnnouncementBar />

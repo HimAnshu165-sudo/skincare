@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { deleteFromBlob } from '@/lib/blob';
+import { requireAdminUser } from '@/lib/auth';
+import { jsonError, jsonSuccess } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,13 +16,10 @@ export async function GET(
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'desc' }],
     });
 
-    return NextResponse.json({ success: true, images });
+    return jsonSuccess({ images });
   } catch (error: any) {
     console.error('Error fetching product images:', error);
-    return NextResponse.json(
-      { success: false, message: 'Failed to fetch product images.' },
-      { status: 500 }
-    );
+    return jsonError('Failed to fetch product images.', 500);
   }
 }
 
@@ -30,9 +28,20 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAdminUser(request);
+    if (auth.status !== 200 || !auth.user) {
+      return jsonError(auth.error || 'Unauthorized', auth.status);
+    }
+
     const { id: productId } = await params;
-    const body = await request.json();
-    const { imageId, isPrimary, alt, sortOrder, reorderedIds } = body;
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonError('Invalid JSON payload.', 400);
+    }
+
+    const { imageId, isPrimary, alt, sortOrder, reorderedIds } = body || {};
 
     // Handle full reordering array if provided
     if (Array.isArray(reorderedIds)) {
@@ -46,14 +55,11 @@ export async function PATCH(
         where: { productId },
         orderBy: { sortOrder: 'asc' },
       });
-      return NextResponse.json({ success: true, images: updatedList });
+      return jsonSuccess({ images: updatedList });
     }
 
     if (!imageId) {
-      return NextResponse.json(
-        { success: false, message: 'imageId is required.' },
-        { status: 400 }
-      );
+      return jsonError('imageId is required.', 400);
     }
 
     // If marking as primary, unset others for this product
@@ -73,12 +79,9 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json({ success: true, image: updated });
+    return jsonSuccess({ image: updated });
   } catch (error: any) {
     console.error('Error updating product image:', error);
-    return NextResponse.json(
-      { success: false, message: 'Failed to update image details.' },
-      { status: 500 }
-    );
+    return jsonError('Failed to update image details.', 500);
   }
 }

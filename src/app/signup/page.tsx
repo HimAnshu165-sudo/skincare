@@ -4,7 +4,7 @@ import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { ArrowRight, Lock, Mail, User as UserIcon, Phone, Sparkles, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowRight, Lock, Mail, User as UserIcon, Phone, Sparkles, AlertCircle, Loader2, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 
 function SignupForm() {
   const router = useRouter();
@@ -16,6 +16,9 @@ function SignupForm() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -27,15 +30,44 @@ function SignupForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
+
     setError('');
+
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    const trimmedPhone = phone.trim().replace(/\D/g, '');
+
+    if (!trimmedName || trimmedName.length < 2) {
+      setError('Please enter your full name (at least 2 characters).');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    if (trimmedPhone) {
+      if (trimmedPhone.length !== 10) {
+        setError('Please enter a valid 10-digit mobile number.');
+        return;
+      }
+    }
 
     if (password.length < 6) {
       setError('Password must be at least 6 characters.');
       return;
     }
 
+    if (password !== confirmPassword) {
+      setError('Passwords do not match. Please retype password.');
+      return;
+    }
+
     setSubmitting(true);
-    const result = await signup(name, email, password, phone);
+    const result = await signup(trimmedName, trimmedEmail, password, trimmedPhone || undefined);
     setSubmitting(false);
 
     if (result.success) {
@@ -74,7 +106,7 @@ function SignupForm() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label className="block text-[11px] font-semibold uppercase tracking-wider text-brand-charcoal/70">
-              Full Name
+              Full Name *
             </label>
             <div className="relative">
               <UserIcon className="w-4 h-4 text-foreground/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -91,7 +123,7 @@ function SignupForm() {
 
           <div className="space-y-1.5">
             <label className="block text-[11px] font-semibold uppercase tracking-wider text-brand-charcoal/70">
-              Email Address
+              Email Address *
             </label>
             <div className="relative">
               <Mail className="w-4 h-4 text-foreground/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -107,43 +139,81 @@ function SignupForm() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-brand-charcoal/70">
-              Phone Number (Optional)
-            </label>
+            <div className="flex justify-between items-center">
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-brand-charcoal/70">
+                Phone Number (Optional)
+              </label>
+              <span className="text-[10px] text-foreground/40 font-mono">10 digits</span>
+            </div>
             <div className="relative">
               <Phone className="w-4 h-4 text-foreground/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="tel"
+                maxLength={10}
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+91 98765 43210"
-                className="w-full pl-10 pr-4 py-2.5 bg-surface-base border border-border-strong rounded-xs text-xs sm:text-sm focus:outline-none focus:border-brand-charcoal transition-colors placeholder:text-foreground/30"
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                placeholder="9876543210"
+                className="w-full pl-10 pr-4 py-2.5 bg-surface-base border border-border-strong rounded-xs text-xs sm:text-sm focus:outline-none focus:border-brand-charcoal transition-colors placeholder:text-foreground/30 font-mono"
               />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <label className="block text-[11px] font-semibold uppercase tracking-wider text-brand-charcoal/70">
-              Password (Min. 6 Characters)
+              Password (Min. 6 Characters) *
             </label>
             <div className="relative">
               <Lock className="w-4 h-4 text-foreground/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 required
                 minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-2.5 bg-surface-base border border-border-strong rounded-xs text-xs sm:text-sm focus:outline-none focus:border-brand-charcoal transition-colors placeholder:text-foreground/30"
+                className="w-full pl-10 pr-10 py-2.5 bg-surface-base border border-border-strong rounded-xs text-xs sm:text-sm focus:outline-none focus:border-brand-charcoal transition-colors placeholder:text-foreground/30"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-brand-charcoal transition-colors"
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-brand-charcoal/70">
+              Confirm Password *
+            </label>
+            <div className="relative">
+              <Lock className="w-4 h-4 text-foreground/40 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                required
+                minLength={6}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full pl-10 pr-10 py-2.5 bg-surface-base border border-border-strong rounded-xs text-xs sm:text-sm focus:outline-none focus:border-brand-charcoal transition-colors placeholder:text-foreground/30"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-brand-charcoal transition-colors"
+                title={showConfirmPassword ? 'Hide password' : 'Show password'}
+              >
+                {showConfirmPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              </button>
             </div>
           </div>
 
           <button
             type="submit"
             disabled={submitting}
-            className="w-full mt-3 py-3 bg-brand-charcoal text-white rounded-xs text-xs uppercase tracking-editorial font-medium hover:bg-black transition-all flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(0,0,0,0.08)] disabled:opacity-60"
+            className="w-full mt-3 py-3 bg-brand-charcoal text-white rounded-xs text-xs uppercase tracking-editorial font-medium hover:bg-black transition-all flex items-center justify-center gap-2 shadow-[0_4px_14px_rgba(0,0,0,0.08)] disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {submitting ? (
               <>
@@ -169,6 +239,9 @@ function SignupForm() {
             >
               Sign In
             </Link>
+          </p>
+          <p className="text-[11px] text-foreground/40">
+            Guest items in your bag will be automatically linked to your account.
           </p>
         </div>
       </div>

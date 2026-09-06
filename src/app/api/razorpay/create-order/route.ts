@@ -3,13 +3,20 @@ import { getAuthenticatedUser } from '@/lib/auth';
 import { createOrder } from '@/lib/orders';
 import { createRazorpayOrder } from '@/lib/razorpay';
 import { prisma } from '@/lib/prisma';
+import { isValidEmail, isValidPhone, sanitizeString, validateCartQuantity, jsonError, jsonSuccess } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
     const user = await getAuthenticatedUser(request);
-    const body = await request.json();
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonError('Invalid JSON payload.', 400);
+    }
+
     const {
       customerName,
       customerEmail,
@@ -18,26 +25,75 @@ export async function POST(request: Request) {
       items,
       couponCode,
       notes,
-    } = body;
+    } = body || {};
 
-    if (!customerName || !customerEmail || !customerPhone || !shippingAddress || !items || items.length === 0) {
-      return NextResponse.json(
-        { success: false, message: 'Missing required order details.' },
-        { status: 400 }
-      );
+    const sanitizedName = sanitizeString(customerName, 100);
+    const sanitizedEmail = typeof customerEmail === 'string' ? customerEmail.trim().toLowerCase() : '';
+    const sanitizedPhone = sanitizeString(customerPhone, 20);
+
+    if (!sanitizedName || sanitizedName.length < 2) {
+      return jsonError('Please provide your full name.', 400);
+    }
+
+    if (!isValidEmail(sanitizedEmail)) {
+      return jsonError('Please provide a valid email address.', 400);
+    }
+
+    if (!isValidPhone(sanitizedPhone)) {
+      return jsonError('Please provide a valid 10-digit mobile number.', 400);
+    }
+
+    if (!shippingAddress || typeof shippingAddress !== 'object') {
+      return jsonError('Please provide a complete shipping address.', 400);
+    }
+
+    const addrLine1 = sanitizeString(shippingAddress.addressLine1 || shippingAddress.address, 200);
+    const addrCity = sanitizeString(shippingAddress.city, 100);
+    const addrPostal = sanitizeString(shippingAddress.postalCode || shippingAddress.pincode, 10);
+
+    if (!addrLine1 || !addrCity || !addrPostal) {
+      return jsonError('Please complete all required delivery address fields.', 400);
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return jsonError('Your cart is empty. Please add formulations before checkout.', 400);
+    }
+
+    const sanitizedItems: Array<{ productId: string; quantity: number }> = [];
+    for (const item of items) {
+      if (!item || !item.productId || typeof item.productId !== 'string') {
+        return jsonError('Invalid product item in order.', 400);
+      }
+      const qtyCheck = validateCartQuantity(item.quantity, 99);
+      if (!qtyCheck.valid) {
+        return jsonError(`Invalid quantity for product ${item.productId}.`, 400);
+      }
+      sanitizedItems.push({
+        productId: item.productId,
+        quantity: qtyCheck.quantity,
+      });
     }
 
     // Create order transactionally in database
     const order = await createOrder({
       userId: user ? user.id : null,
-      customerName: customerName.trim(),
-      customerEmail: customerEmail.trim().toLowerCase(),
-      customerPhone: customerPhone.trim(),
-      shippingAddress,
+      customerName: sanitizedName,
+      customerEmail: sanitizedEmail,
+      customerPhone: sanitizedPhone,
+      shippingAddress: {
+        fullName: sanitizeString(shippingAddress.fullName || sanitizedName, 100),
+        phone: sanitizeString(shippingAddress.phone || sanitizedPhone, 20),
+        addressLine1: addrLine1,
+        addressLine2: sanitizeString(shippingAddress.addressLine2 || shippingAddress.apartment, 200) || undefined,
+        city: addrCity,
+        state: sanitizeString(shippingAddress.state || 'India', 100),
+        postalCode: addrPostal,
+        country: sanitizeString(shippingAddress.country || 'India', 50),
+      },
       paymentMethod: 'ONLINE',
-      items,
-      couponCode: couponCode ? couponCode.trim() : null,
-      notes: notes ? notes.trim() : null,
+      items: sanitizedItems,
+      couponCode: couponCode ? sanitizeString(couponCode, 30) : null,
+      notes: notes ? sanitizeString(notes, 500) : null,
     });
 
     // Create Razorpay order
@@ -56,8 +112,7 @@ export async function POST(request: Request) {
 
     const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholderKeyId';
 
-    return NextResponse.json({
-      success: true,
+    return jsonSuccess({
       keyId,
       razorpayOrder,
       order: {
@@ -68,12 +123,9 @@ export async function POST(request: Request) {
         shippingFee: order.shippingFee,
         items: order.items,
       },
-    });
+    }, 201);
   } catch (error: any) {
     console.error('Error creating Razorpay order:', error);
-    return NextResponse.json(
-      { success: false, message: error.message || 'Server error creating payment order.' },
-      { status: 400 }
-    );
+    return jsonError(error.message || 'Server error creating payment order.', 400);
   }
 }

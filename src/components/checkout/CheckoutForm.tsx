@@ -376,10 +376,11 @@ export function CheckoutForm() {
                 type="tel"
                 name="phone"
                 required
+                maxLength={10}
                 value={formData.phone}
-                onChange={handleInputChange}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
                 placeholder="9876543210"
-                className="w-full px-3.5 py-2.5 bg-surface-base border border-border-strong rounded-r-xs focus:outline-none focus:border-brand-charcoal text-xs sm:text-sm"
+                className="w-full px-3.5 py-2.5 bg-surface-base border border-border-strong rounded-r-xs focus:outline-none focus:border-brand-charcoal text-xs sm:text-sm font-mono"
               />
             </div>
           </div>

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { ArrowLeft, User, Lock, Phone, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, User, Lock, Phone, Check, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
 
 export default function AccountProfilePage() {
   const { user, loading, refreshUser } = useAuth();
@@ -14,6 +14,8 @@ export default function AccountProfilePage() {
   const [phone, setPhone] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -36,6 +38,12 @@ export default function AccountProfilePage() {
     setSuccessMsg('');
     setErrorMsg('');
 
+    const cleanedPhone = phone.trim().replace(/\D/g, '');
+    if (cleanedPhone && cleanedPhone.length !== 10) {
+      setErrorMsg('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
     if (newPassword && newPassword !== confirmPassword) {
       setErrorMsg('Passwords do not match.');
       return;
@@ -49,7 +57,7 @@ export default function AccountProfilePage() {
     setSaving(true);
 
     try {
-      const payload: any = { name, phone };
+      const payload: any = { name: name.trim(), phone: cleanedPhone || null };
       if (newPassword) payload.password = newPassword;
 
       const res = await fetch('/api/auth/me', {
@@ -155,15 +163,19 @@ export default function AccountProfilePage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="font-semibold uppercase tracking-wider text-brand-charcoal/70">
-                  Phone Number
-                </label>
+                <div className="flex justify-between items-center">
+                  <label className="font-semibold uppercase tracking-wider text-brand-charcoal/70">
+                    Phone Number
+                  </label>
+                  <span className="text-[10px] text-foreground/40 font-mono">10 digits</span>
+                </div>
                 <input
                   type="tel"
+                  maxLength={10}
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+91 98765 43210"
-                  className="w-full px-3.5 py-2.5 bg-surface-base border border-border-strong rounded-xs focus:outline-none focus:border-brand-charcoal text-xs sm:text-sm"
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  placeholder="9876543210"
+                  className="w-full px-3.5 py-2.5 bg-surface-base border border-border-strong rounded-xs focus:outline-none focus:border-brand-charcoal text-xs sm:text-sm font-mono"
                 />
               </div>
             </div>
@@ -179,26 +191,46 @@ export default function AccountProfilePage() {
                   <label className="font-semibold uppercase tracking-wider text-brand-charcoal/70">
                     New Password
                   </label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Leave blank to keep current"
-                    className="w-full px-3.5 py-2.5 bg-surface-base border border-border-strong rounded-xs focus:outline-none focus:border-brand-charcoal text-xs sm:text-sm"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Leave blank to keep current"
+                      className="w-full pl-3.5 pr-10 py-2.5 bg-surface-base border border-border-strong rounded-xs focus:outline-none focus:border-brand-charcoal text-xs sm:text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-brand-charcoal transition-colors"
+                      title={showNewPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showNewPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
                   <label className="font-semibold uppercase tracking-wider text-brand-charcoal/70">
                     Confirm New Password
                   </label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Repeat new password"
-                    className="w-full px-3.5 py-2.5 bg-surface-base border border-border-strong rounded-xs focus:outline-none focus:border-brand-charcoal text-xs sm:text-sm"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Repeat new password"
+                      className="w-full pl-3.5 pr-10 py-2.5 bg-surface-base border border-border-strong rounded-xs focus:outline-none focus:border-brand-charcoal text-xs sm:text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-brand-charcoal transition-colors"
+                      title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showConfirmPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

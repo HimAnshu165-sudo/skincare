@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Sparkles, ShieldCheck } from 'lucide-react';
+import { X } from 'lucide-react';
 
 export function AnnouncementBar() {
   const [isVisible, setIsVisible] = useState(true);
@@ -18,9 +18,11 @@ export function AnnouncementBar() {
           <span className="hidden md:inline text-brand-sand">Use code <strong className="text-brand-amber font-semibold">VELYRA10</strong> for 10% off</span>
         </div>
         <button
+          type="button"
           onClick={() => setIsVisible(false)}
           className="text-brand-sand/60 hover:text-white transition-colors p-1"
           aria-label="Close banner"
+          suppressHydrationWarning
         >
           <X className="w-3.5 h-3.5" />
         </button>

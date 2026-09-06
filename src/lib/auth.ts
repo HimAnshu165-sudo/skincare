@@ -5,10 +5,12 @@ import { SignJWT, jwtVerify } from 'jose';
 import { prisma } from './prisma';
 
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.AUTH_SECRET || process.env.ADMIN_SECRET_KEY || 'velyra-luxury-skincare-secret-jwt-token-2026-production'
+  process.env.AUTH_SECRET || 'velyra-luxury-skincare-secret-jwt-token-2026-production-key-signed'
 );
 
-const SESSION_COOKIE_NAME = 'velyra_session';
+export const SESSION_COOKIE_NAME = 'velyra_session';
+export const GUEST_COOKIE_NAME = 'velyra_guest_token';
+export const ADMIN_MFA_COOKIE_NAME = 'velyra_admin_mfa';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
 export interface SessionPayload {
@@ -16,6 +18,7 @@ export interface SessionPayload {
   email: string;
   role: string;
   name: string;
+  mfaVerified?: boolean;
 }
 
 export interface AuthenticatedUser {
@@ -24,11 +27,41 @@ export interface AuthenticatedUser {
   email: string;
   phone: string | null;
   role: string;
+  hasMfaConfigured?: boolean;
   createdAt: Date;
 }
 
+export interface AdminAuthResult {
+  user: AuthenticatedUser | null;
+  status: 200 | 401 | 403;
+  error?: string;
+}
+
 /**
- * Hash plain-text password using bcrypt with salt.
+ * Robust cookie value extraction from Request headers, NextRequest, or Next.js cookies()
+ */
+export async function getCookieValue(name: string, request?: Request | NextRequest): Promise<string | null> {
+  if (request) {
+    if ('cookies' in request && typeof (request as any).cookies?.get === 'function') {
+      const val = (request as any).cookies.get(name)?.value;
+      if (val) return val;
+    }
+    const cookieHeader = request.headers.get('cookie');
+    if (cookieHeader) {
+      const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+      if (match) return decodeURIComponent(match[1]);
+    }
+  }
+  try {
+    const cookieStore = await cookies();
+    return cookieStore.get(name)?.value || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Hash plain-text password using bcrypt with salt rounds = 10.
  */
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);
@@ -38,6 +71,7 @@ export async function hashPassword(password: string): Promise<string> {
  * Compare plain-text password with bcrypt hash.
  */
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  if (!password || !hash) return false;
   return bcrypt.compare(password, hash);
 }
 
@@ -65,7 +99,7 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
 }
 
 /**
- * Set httpOnly secure session cookie in response headers or Next.js cookies().
+ * Set httpOnly secure session cookie.
  */
 export async function setSessionCookie(token: string) {
   const cookieStore = await cookies();
@@ -93,22 +127,26 @@ export async function clearSessionCookie() {
 }
 
 /**
+ * Clear guest token cookie after login/signup/logout.
+ */
+export async function clearGuestCookie() {
+  const cookieStore = await cookies();
+  cookieStore.set(GUEST_COOKIE_NAME, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+  });
+}
+
+/**
  * Get the currently authenticated user from server-side session cookie.
- * Validates against PostgreSQL User table to ensure user exists and is active.
+ * Validates against PostgreSQL User table on every request to ensure user exists and role is live.
  */
 export async function getAuthenticatedUser(request?: NextRequest | Request): Promise<AuthenticatedUser | null> {
   try {
-    let token: string | undefined;
-
-    if (request && 'cookies' in request && typeof (request as any).cookies?.get === 'function') {
-      token = (request as any).cookies.get(SESSION_COOKIE_NAME)?.value;
-    }
-
-    if (!token) {
-      const cookieStore = await cookies();
-      token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-    }
-
+    const token = await getCookieValue(SESSION_COOKIE_NAME, request);
     if (!token) return null;
 
     const payload = await verifySessionToken(token);
@@ -122,11 +160,22 @@ export async function getAuthenticatedUser(request?: NextRequest | Request): Pro
         email: true,
         phone: true,
         role: true,
+        adminMfaPin: true,
         createdAt: true,
       },
     });
 
-    return user;
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      hasMfaConfigured: Boolean(user.adminMfaPin),
+      createdAt: user.createdAt,
+    };
   } catch (error) {
     console.error('Error fetching authenticated user:', error);
     return null;
@@ -134,7 +183,7 @@ export async function getAuthenticatedUser(request?: NextRequest | Request): Pro
 }
 
 /**
- * Require authenticated customer; throws or returns null.
+ * Require authenticated customer; throws UNAUTHORIZED if not signed in.
  */
 export async function requireAuth(): Promise<AuthenticatedUser> {
   const user = await getAuthenticatedUser();
@@ -145,21 +194,46 @@ export async function requireAuth(): Promise<AuthenticatedUser> {
 }
 
 /**
- * Require Admin authorization (via session role or ADMIN_SECRET_KEY header).
+ * Centralized Server-Side Admin Authorization.
+ * Verifies:
+ * 1. Authenticated session exists
+ * 2. User exists in PostgreSQL
+ * 3. user.role === 'ADMIN'
+ * 
+ * Returns:
+ * - status: 401 for unauthenticated
+ * - status: 403 for authenticated non-admin users
+ * - status: 200 with authenticated Admin User
  */
-export async function requireAdmin(request?: Request): Promise<boolean> {
-  if (request) {
-    const authHeader = request.headers.get('Authorization') || request.headers.get('x-admin-key');
-    const secretKey = process.env.ADMIN_SECRET_KEY || 'velyra-admin-secure-2026';
-    if (authHeader && (authHeader === secretKey || authHeader === `Bearer ${secretKey}`)) {
-      return true;
-    }
+export async function requireAdminUser(request?: Request | NextRequest): Promise<AdminAuthResult> {
+  const user = await getAuthenticatedUser(request);
+
+  if (!user) {
+    return {
+      user: null,
+      status: 401,
+      error: 'Unauthorized: Authentication required. Please sign in.',
+    };
   }
 
-  const user = await getAuthenticatedUser();
-  if (user && user.role === 'ADMIN') {
-    return true;
+  if (user.role !== 'ADMIN') {
+    return {
+      user,
+      status: 403,
+      error: 'Forbidden: Administrative access required. Your account role is CUSTOMER.',
+    };
   }
 
-  return false;
+  return {
+    user,
+    status: 200,
+  };
+}
+
+/**
+ * Backward compatibility boolean check.
+ */
+export async function requireAdmin(request?: Request | NextRequest): Promise<boolean> {
+  const result = await requireAdminUser(request);
+  return result.status === 200;
 }

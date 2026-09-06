@@ -2,13 +2,20 @@ import { NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth';
 import { createOrder } from '@/lib/orders';
 import { prisma } from '@/lib/prisma';
+import { isValidEmail, isValidPhone, sanitizeString, validateCartQuantity, jsonError, jsonSuccess } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
     const user = await getAuthenticatedUser(request);
-    const body = await request.json();
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonError('Invalid JSON payload.', 400);
+    }
+
     const {
       customerName,
       customerEmail,
@@ -19,27 +26,76 @@ export async function POST(request: Request) {
       couponCode,
       notes,
       saveAddressToAccount,
-    } = body;
+    } = body || {};
 
-    // Server-side validation
-    if (!customerName || !customerEmail || !customerPhone || !shippingAddress || !items || items.length === 0) {
-      return NextResponse.json(
-        { success: false, message: 'Missing required order details.' },
-        { status: 400 }
-      );
+    const sanitizedName = sanitizeString(customerName, 100);
+    const sanitizedEmail = typeof customerEmail === 'string' ? customerEmail.trim().toLowerCase() : '';
+    const sanitizedPhone = sanitizeString(customerPhone, 20);
+
+    if (!sanitizedName || sanitizedName.length < 2) {
+      return jsonError('Please provide your full name.', 400);
     }
 
-    // Call transactional order creation engine
+    if (!isValidEmail(sanitizedEmail)) {
+      return jsonError('Please provide a valid email address.', 400);
+    }
+
+    if (!isValidPhone(sanitizedPhone)) {
+      return jsonError('Please provide a valid 10-digit mobile number.', 400);
+    }
+
+    if (!shippingAddress || typeof shippingAddress !== 'object') {
+      return jsonError('Please provide a complete shipping address.', 400);
+    }
+
+    const addrLine1 = sanitizeString(shippingAddress.addressLine1 || shippingAddress.address, 200);
+    const addrCity = sanitizeString(shippingAddress.city, 100);
+    const addrPostal = sanitizeString(shippingAddress.postalCode || shippingAddress.pincode, 10);
+
+    if (!addrLine1 || !addrCity || !addrPostal) {
+      return jsonError('Please complete all required delivery address fields.', 400);
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return jsonError('Your cart is empty. Please add products to order.', 400);
+    }
+
+    // Validate items structure
+    const sanitizedItems: Array<{ productId: string; quantity: number }> = [];
+    for (const item of items) {
+      if (!item || !item.productId || typeof item.productId !== 'string') {
+        return jsonError('Invalid product item in order.', 400);
+      }
+      const qtyCheck = validateCartQuantity(item.quantity, 99);
+      if (!qtyCheck.valid) {
+        return jsonError(`Invalid quantity for product ${item.productId}.`, 400);
+      }
+      sanitizedItems.push({
+        productId: item.productId,
+        quantity: qtyCheck.quantity,
+      });
+    }
+
+    // Call transactional order creation engine with server-side price validation
     const order = await createOrder({
       userId: user ? user.id : null,
-      customerName: customerName.trim(),
-      customerEmail: customerEmail.trim().toLowerCase(),
-      customerPhone: customerPhone.trim(),
-      shippingAddress,
+      customerName: sanitizedName,
+      customerEmail: sanitizedEmail,
+      customerPhone: sanitizedPhone,
+      shippingAddress: {
+        fullName: sanitizeString(shippingAddress.fullName || sanitizedName, 100),
+        phone: sanitizeString(shippingAddress.phone || sanitizedPhone, 20),
+        addressLine1: addrLine1,
+        addressLine2: sanitizeString(shippingAddress.addressLine2 || shippingAddress.apartment, 200) || undefined,
+        city: addrCity,
+        state: sanitizeString(shippingAddress.state || 'India', 100),
+        postalCode: addrPostal,
+        country: sanitizeString(shippingAddress.country || 'India', 50),
+      },
       paymentMethod: paymentMethod === 'ONLINE' ? 'ONLINE' : 'COD',
-      items,
-      couponCode: couponCode ? couponCode.trim() : null,
-      notes: notes ? notes.trim() : null,
+      items: sanitizedItems,
+      couponCode: couponCode ? sanitizeString(couponCode, 30) : null,
+      notes: notes ? sanitizeString(notes, 500) : null,
     });
 
     // Optionally save address to user's address book
@@ -48,8 +104,8 @@ export async function POST(request: Request) {
         const addressExists = await prisma.address.findFirst({
           where: {
             userId: user.id,
-            addressLine1: shippingAddress.addressLine1,
-            postalCode: shippingAddress.postalCode,
+            addressLine1: addrLine1,
+            postalCode: addrPostal,
           },
         });
 
@@ -58,14 +114,14 @@ export async function POST(request: Request) {
           await prisma.address.create({
             data: {
               userId: user.id,
-              fullName: shippingAddress.fullName || customerName,
-              phone: shippingAddress.phone || customerPhone,
-              addressLine1: shippingAddress.addressLine1,
-              addressLine2: shippingAddress.addressLine2 || null,
-              city: shippingAddress.city,
-              state: shippingAddress.state,
-              postalCode: shippingAddress.postalCode,
-              country: shippingAddress.country || 'India',
+              fullName: sanitizeString(shippingAddress.fullName || sanitizedName, 100),
+              phone: sanitizeString(shippingAddress.phone || sanitizedPhone, 20),
+              addressLine1: addrLine1,
+              addressLine2: sanitizeString(shippingAddress.addressLine2 || shippingAddress.apartment, 200) || null,
+              city: addrCity,
+              state: sanitizeString(shippingAddress.state || 'India', 100),
+              postalCode: addrPostal,
+              country: sanitizeString(shippingAddress.country || 'India', 50),
               addressType: shippingAddress.addressType || 'HOME',
               isDefault: count === 0,
             },
@@ -76,8 +132,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({
-      success: true,
+    return jsonSuccess({
       order: {
         id: order.id,
         orderNumber: order.orderNumber,
@@ -90,12 +145,9 @@ export async function POST(request: Request) {
         orderStatus: order.orderStatus,
         items: order.items,
       },
-    });
+    }, 201);
   } catch (error: any) {
     console.error('Error creating checkout order:', error);
-    return NextResponse.json(
-      { success: false, message: error.message || 'Failed to place order.' },
-      { status: 400 }
-    );
+    return jsonError(error.message || 'Failed to place order.', 400);
   }
 }

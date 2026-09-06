@@ -45,14 +45,18 @@ export interface CartItem {
 }
 
 export interface ShippingAddress {
-  fullName: string;
-  phone: string;
-  email: string;
-  address: string;
+  fullName?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  addressLine1?: string;
   apartment?: string;
-  city: string;
-  state: string;
-  pincode: string;
+  addressLine2?: string | null;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  postalCode?: string;
+  country?: string;
 }
 
 export interface OrderItem {

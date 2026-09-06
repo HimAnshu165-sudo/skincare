@@ -28,6 +28,7 @@ interface MediaItem {
   isPrimary: boolean;
   size?: number | null;
   contentType?: string | null;
+  isBlobCdn?: boolean;
   createdAt: string;
   product?: {
     id: string;
@@ -39,6 +40,8 @@ interface MediaItem {
 export default function AdminMediaPage() {
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isBlobConfigured, setIsBlobConfigured] = useState(false);
+  const [storeName, setStoreName] = useState('local-fallback');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [selectedFolder, setSelectedFolder] = useState('ALL');
@@ -58,7 +61,9 @@ export default function AdminMediaPage() {
       const res = await fetch('/api/admin/media');
       const data = await res.json();
       if (data.success) {
-        setMedia(data.images);
+        setMedia(data.images || []);
+        setIsBlobConfigured(Boolean(data.isBlobConfigured));
+        setStoreName(data.storeName || 'local-fallback');
       }
     } catch (e) {
       console.error('Error fetching media:', e);
@@ -166,9 +171,23 @@ export default function AdminMediaPage() {
             <h1 className="font-serif text-3xl sm:text-4xl text-brand-charcoal font-normal">
               Vercel Blob Media Library
             </h1>
-            <p className="text-xs text-brand-mineral mt-1">
-              Store: <strong className="font-semibold text-brand-charcoal">velyra-media</strong> (Public CDN CDN distribution)
-            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs text-brand-mineral">
+                Store: <strong className="font-semibold text-brand-charcoal">{isBlobConfigured ? 'velyra-media' : 'Local Fallback (/public)'}</strong>
+              </span>
+              <span className="text-stone-300">•</span>
+              {isBlobConfigured ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Vercel Blob Connected
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                  Local Development Mode
+                </span>
+              )}
+            </div>
           </div>
 
           <button
@@ -179,6 +198,18 @@ export default function AdminMediaPage() {
             <span>Refresh Storage</span>
           </button>
         </div>
+
+        {!isBlobConfigured && (
+          <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-sm text-xs text-amber-900 space-y-1">
+            <div className="flex items-center gap-2 font-semibold">
+              <Shield className="w-4 h-4 text-amber-600" />
+              <span>Vercel Blob Storage Token Required for Cloud CDN Sync</span>
+            </div>
+            <p className="text-[11px] text-amber-800 leading-relaxed">
+              Images below are currently resolved from local <code className="font-mono bg-amber-100/80 px-1 py-0.5 rounded">/public</code> assets because <code className="font-mono bg-amber-100/80 px-1 py-0.5 rounded">BLOB_READ_WRITE_TOKEN</code> is not set in <code className="font-mono bg-amber-100/80 px-1 py-0.5 rounded">.env</code>. To upload files to the live <strong className="font-semibold">velyra-media</strong> Vercel Blob CDN store, add your token to <code className="font-mono bg-amber-100/80 px-1 py-0.5 rounded">.env</code> and run <code className="font-mono bg-amber-100/80 px-1 py-0.5 rounded">node scripts/migrate-public-to-blob.mjs</code>.
+            </p>
+          </div>
+        )}
 
         {/* Upload Drawer Card */}
         <div className="bg-surface-elevated rounded-sm border border-border-subtle p-6 sm:p-8 shadow-sm space-y-5">
@@ -328,11 +359,22 @@ export default function AdminMediaPage() {
                       sizes="(max-width: 768px) 50vw, 20vw"
                       className="object-contain p-2"
                     />
-                    {item.isPrimary && (
-                      <span className="absolute top-2 left-2 bg-brand-amber text-brand-charcoal text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-xs">
-                        Primary
-                      </span>
-                    )}
+                    <div className="absolute top-2 left-2 flex flex-col gap-1">
+                      {item.isPrimary && (
+                        <span className="bg-brand-amber text-brand-charcoal text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-xs">
+                          Primary
+                        </span>
+                      )}
+                      {item.isBlobCdn ? (
+                        <span className="bg-emerald-800/90 text-white text-[8px] font-mono uppercase px-1 py-0.5 rounded-xs">
+                          Blob CDN
+                        </span>
+                      ) : (
+                        <span className="bg-stone-800/80 text-stone-200 text-[8px] font-mono uppercase px-1 py-0.5 rounded-xs">
+                          /public
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Metadata */}

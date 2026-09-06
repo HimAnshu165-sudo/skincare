@@ -355,10 +355,11 @@ export default function AccountAddressesPage() {
                     <input
                       type="tel"
                       required
+                      maxLength={10}
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                       placeholder="10-digit mobile"
-                      className="w-full px-3 py-2 bg-surface-base border border-border-strong rounded-xs focus:outline-none focus:border-brand-charcoal"
+                      className="w-full px-3 py-2 bg-surface-base border border-border-strong rounded-xs focus:outline-none focus:border-brand-charcoal font-mono"
                     />
                   </div>
                 </div>

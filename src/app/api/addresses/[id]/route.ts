@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getAuthenticatedUser } from '@/lib/auth';
+import { isValidPhone, isValidPostalCode, sanitizeString, jsonError, jsonSuccess } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,11 +12,20 @@ export async function PATCH(
   try {
     const user = await getAuthenticatedUser(request);
     if (!user) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+      return jsonError('Unauthorized', 401);
     }
 
     const { id } = await params;
-    const body = await request.json();
+    if (!id) {
+      return jsonError('Address ID is required.', 400);
+    }
+
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonError('Invalid JSON payload.', 400);
+    }
 
     // Verify ownership
     const existing = await prisma.address.findFirst({
@@ -23,7 +33,53 @@ export async function PATCH(
     });
 
     if (!existing) {
-      return NextResponse.json({ success: false, message: 'Address not found.' }, { status: 404 });
+      return jsonError('Address not found or unauthorized.', 404);
+    }
+
+    const updates: any = {};
+
+    if (body.fullName !== undefined) {
+      const name = sanitizeString(body.fullName, 100);
+      if (name.length < 2) return jsonError('Name must be at least 2 characters.', 400);
+      updates.fullName = name;
+    }
+
+    if (body.phone !== undefined) {
+      const phone = sanitizeString(body.phone, 20);
+      if (!isValidPhone(phone)) return jsonError('Please enter a valid phone number.', 400);
+      updates.phone = phone;
+    }
+
+    if (body.addressLine1 !== undefined) {
+      const addr1 = sanitizeString(body.addressLine1, 200);
+      if (!addr1) return jsonError('Address line 1 cannot be empty.', 400);
+      updates.addressLine1 = addr1;
+    }
+
+    if (body.addressLine2 !== undefined) {
+      updates.addressLine2 = body.addressLine2 ? sanitizeString(body.addressLine2, 200) : null;
+    }
+
+    if (body.city !== undefined) {
+      const city = sanitizeString(body.city, 100);
+      if (!city) return jsonError('City cannot be empty.', 400);
+      updates.city = city;
+    }
+
+    if (body.state !== undefined) {
+      const state = sanitizeString(body.state, 100);
+      if (!state) return jsonError('State cannot be empty.', 400);
+      updates.state = state;
+    }
+
+    if (body.postalCode !== undefined) {
+      const postal = sanitizeString(body.postalCode, 10);
+      if (!isValidPostalCode(postal)) return jsonError('Please enter a valid 6-digit PIN code.', 400);
+      updates.postalCode = postal;
+    }
+
+    if (body.addressType !== undefined) {
+      updates.addressType = body.addressType === 'WORK' || body.addressType === 'OTHER' ? body.addressType : 'HOME';
     }
 
     if (body.isDefault) {
@@ -31,27 +87,18 @@ export async function PATCH(
         where: { userId: user.id },
         data: { isDefault: false },
       });
+      updates.isDefault = true;
     }
 
     const updated = await prisma.address.update({
       where: { id },
-      data: {
-        ...(body.fullName && { fullName: body.fullName.trim() }),
-        ...(body.phone && { phone: body.phone.trim() }),
-        ...(body.addressLine1 && { addressLine1: body.addressLine1.trim() }),
-        ...(body.addressLine2 !== undefined && { addressLine2: body.addressLine2 ? body.addressLine2.trim() : null }),
-        ...(body.city && { city: body.city.trim() }),
-        ...(body.state && { state: body.state.trim() }),
-        ...(body.postalCode && { postalCode: body.postalCode.trim() }),
-        ...(body.addressType && { addressType: body.addressType }),
-        ...(body.isDefault !== undefined && { isDefault: body.isDefault }),
-      },
+      data: updates,
     });
 
-    return NextResponse.json({ success: true, address: updated });
+    return jsonSuccess({ address: updated });
   } catch (error: any) {
     console.error('Error updating address:', error);
-    return NextResponse.json({ success: false, message: 'Failed to update address.' }, { status: 500 });
+    return jsonError('Failed to update address.', 500);
   }
 }
 
@@ -62,10 +109,13 @@ export async function DELETE(
   try {
     const user = await getAuthenticatedUser(request);
     if (!user) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+      return jsonError('Unauthorized', 401);
     }
 
     const { id } = await params;
+    if (!id) {
+      return jsonError('Address ID is required.', 400);
+    }
 
     // Verify ownership and delete
     const result = await prisma.address.deleteMany({
@@ -73,12 +123,12 @@ export async function DELETE(
     });
 
     if (result.count === 0) {
-      return NextResponse.json({ success: false, message: 'Address not found.' }, { status: 404 });
+      return jsonError('Address not found or unauthorized.', 404);
     }
 
-    return NextResponse.json({ success: true, message: 'Address deleted.' });
+    return jsonSuccess({ message: 'Address deleted successfully.' });
   } catch (error: any) {
     console.error('Error deleting address:', error);
-    return NextResponse.json({ success: false, message: 'Failed to delete address.' }, { status: 500 });
+    return jsonError('Failed to delete address.', 500);
   }
 }

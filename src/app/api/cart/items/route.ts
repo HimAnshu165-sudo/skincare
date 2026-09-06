@@ -1,29 +1,57 @@
 import { NextResponse } from 'next/server';
-import { getAuthenticatedUser } from '@/lib/auth';
-import { getOrCreateCart, addItemToCart } from '@/lib/cart';
 import { cookies } from 'next/headers';
+import { getAuthenticatedUser, getCookieValue, GUEST_COOKIE_NAME } from '@/lib/auth';
+import { getOrCreateCart, addItemToCart } from '@/lib/cart';
+import { prisma } from '@/lib/prisma';
+import { validateCartQuantity, jsonError, jsonSuccess } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { productId, quantity = 1 } = body;
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonError('Invalid JSON payload.', 400);
+    }
 
-    if (!productId || quantity <= 0) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid product or quantity.' },
-        { status: 400 }
-      );
+    const { productId, quantity = 1 } = body || {};
+
+    if (!productId || typeof productId !== 'string') {
+      return jsonError('A valid productId is required.', 400);
+    }
+
+    // Verify product exists in catalog
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      return jsonError('Product not found.', 404);
+    }
+
+    if (!product.inStock || product.isUpcoming) {
+      return jsonError('This formulation is currently unavailable.', 400);
+    }
+
+    if (product.stockQuantity <= 0) {
+      return jsonError('Product is currently out of stock.', 400);
+    }
+
+    // Strict quantity validation
+    const qtyCheck = validateCartQuantity(quantity, Math.min(product.stockQuantity, 99));
+    if (!qtyCheck.valid) {
+      return jsonError(qtyCheck.error || 'Invalid quantity.', 400);
     }
 
     const user = await getAuthenticatedUser(request);
-    const cookieStore = await cookies();
-    let guestToken = cookieStore.get('velyra_guest_token')?.value || null;
+    let guestToken = await getCookieValue(GUEST_COOKIE_NAME, request);
 
     if (!user && !guestToken) {
-      guestToken = `gst_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-      cookieStore.set('velyra_guest_token', guestToken, {
+      guestToken = `gst_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+      const cookieStore = await cookies();
+      cookieStore.set(GUEST_COOKIE_NAME, guestToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
@@ -34,24 +62,17 @@ export async function POST(request: Request) {
 
     const cart = await getOrCreateCart(user ? user.id : null, guestToken);
     if (!cart) {
-      return NextResponse.json(
-        { success: false, message: 'Unable to initialize cart.' },
-        { status: 500 }
-      );
+      return jsonError('Unable to initialize cart session.', 500);
     }
 
-    const updatedCart = await addItemToCart(cart.id, productId, quantity);
+    const updatedCart = await addItemToCart(cart.id, productId, qtyCheck.quantity);
 
-    return NextResponse.json({
-      success: true,
+    return jsonSuccess({
       cart: updatedCart,
       message: 'Item added to cart.',
     });
   } catch (error: any) {
     console.error('Error adding to cart:', error);
-    return NextResponse.json(
-      { success: false, message: error.message || 'Failed to add item to cart.' },
-      { status: 400 }
-    );
+    return jsonError(error.message || 'Failed to add item to cart.', 400);
   }
 }

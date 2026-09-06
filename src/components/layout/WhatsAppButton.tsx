@@ -16,9 +16,11 @@ export function WhatsAppButton() {
       {showTooltip && (
         <div className="bg-surface-elevated text-brand-charcoal p-3.5 rounded-sm shadow-xl border border-border-subtle text-xs max-w-xs animate-fade-in relative">
           <button
+            type="button"
             onClick={() => setShowTooltip(false)}
             className="absolute top-1.5 right-1.5 text-brand-mineral hover:text-brand-charcoal"
             aria-label="Close tooltip"
+            suppressHydrationWarning
           >
             <X className="w-3.5 h-3.5" />
           </button>

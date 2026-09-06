@@ -1,64 +1,90 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { hashPassword, createSessionToken, setSessionCookie } from '@/lib/auth';
+import { hashPassword, createSessionToken, setSessionCookie, clearGuestCookie, getCookieValue, GUEST_COOKIE_NAME } from '@/lib/auth';
 import { mergeGuestCartIntoUserCart } from '@/lib/cart';
+import { isValidEmail, isValidPassword, isValidPhone, normalizePhone, sanitizeString, jsonError, jsonSuccess } from '@/lib/validation';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { name, email, password, phone, guestToken } = body;
-
-    if (!name || !email || !password) {
-      return NextResponse.json(
-        { success: false, message: 'Name, email, and password are required.' },
-        { status: 400 }
-      );
+    const ip = getClientIp(request);
+    const rateCheck = checkRateLimit(`signup:${ip}`, 5, 60000);
+    if (!rateCheck.allowed) {
+      return jsonError(`Too many signup attempts. Please try again in ${rateCheck.resetSeconds}s.`, 429);
     }
 
-    const trimmedEmail = email.trim().toLowerCase();
-
-    if (password.length < 6) {
-      return NextResponse.json(
-        { success: false, message: 'Password must be at least 6 characters.' },
-        { status: 400 }
-      );
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonError('Invalid or malformed JSON payload.', 400);
     }
 
-    // Check existing email
+    const { name, email, password, phone, guestToken: bodyGuestToken } = body || {};
+
+    const sanitizedName = sanitizeString(name, 100);
+    const sanitizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const sanitizedPhone = phone ? sanitizeString(phone, 20) : null;
+
+    // Field-level validations
+    if (!sanitizedName || sanitizedName.length < 2) {
+      return jsonError('Please enter your full name (at least 2 characters).', 400);
+    }
+
+    if (!isValidEmail(sanitizedEmail)) {
+      return jsonError('Please provide a valid email address.', 400);
+    }
+
+    if (!isValidPassword(password, 6)) {
+      return jsonError('Password must be at least 6 characters long.', 400);
+    }
+
+    if (sanitizedPhone && !isValidPhone(sanitizedPhone)) {
+      return jsonError('Please enter a valid 10-digit mobile number.', 400);
+    }
+    const finalPhone = sanitizedPhone ? normalizePhone(sanitizedPhone) : null;
+
+    // Check existing email pre-flight
     const existing = await prisma.user.findUnique({
-      where: { email: trimmedEmail },
+      where: { email: sanitizedEmail },
     });
 
     if (existing) {
-      return NextResponse.json(
-        { success: false, message: 'An account with this email already exists.' },
-        { status: 409 }
-      );
+      return jsonError('An account with this email already exists.', 409);
     }
 
     const hashedPassword = await hashPassword(password);
 
-    const user = await prisma.user.create({
-      data: {
-        name: name.trim(),
-        email: trimmedEmail,
-        password: hashedPassword,
-        phone: phone ? phone.trim() : null,
-        role: 'CUSTOMER',
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        role: true,
-        createdAt: true,
-      },
-    });
+    let user;
+    try {
+      // Role Escalation Defense: ALWAYS create new users with 'CUSTOMER' role
+      user = await prisma.user.create({
+        data: {
+          name: sanitizedName,
+          email: sanitizedEmail,
+          password: hashedPassword,
+          phone: finalPhone,
+          role: 'CUSTOMER',
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          role: true,
+          createdAt: true,
+        },
+      });
+    } catch (dbError: any) {
+      if (dbError?.code === 'P2002') {
+        return jsonError('An account with this email already exists.', 409);
+      }
+      throw dbError;
+    }
 
-    // Create session token and set cookie
+    // Create session token and set secure httpOnly cookie
     const token = await createSessionToken({
       userId: user.id,
       email: user.email,
@@ -68,21 +94,24 @@ export async function POST(request: Request) {
 
     await setSessionCookie(token);
 
-    // Merge guest cart if guestToken provided
+    // Resolve guest token from body OR cookies
+    const guestToken = bodyGuestToken || (await getCookieValue(GUEST_COOKIE_NAME, request));
+
     if (guestToken) {
-      await mergeGuestCartIntoUserCart(guestToken, user.id);
+      try {
+        await mergeGuestCartIntoUserCart(guestToken, user.id);
+      } catch (mergeError) {
+        console.error('Non-blocking cart merge error on signup:', mergeError);
+      }
+      await clearGuestCookie();
     }
 
-    return NextResponse.json({
-      success: true,
+    return jsonSuccess({
       user,
       message: 'Account created successfully.',
-    });
+    }, 201);
   } catch (error: any) {
     console.error('Signup error:', error);
-    return NextResponse.json(
-      { success: false, message: 'Failed to create account.' },
-      { status: 500 }
-    );
+    return jsonError('An unexpected error occurred while creating your account.', 500);
   }
 }

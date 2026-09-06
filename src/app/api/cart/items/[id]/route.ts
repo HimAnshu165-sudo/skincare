@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getAuthenticatedUser } from '@/lib/auth';
+import { getAuthenticatedUser, getCookieValue, GUEST_COOKIE_NAME } from '@/lib/auth';
 import { getOrCreateCart, updateCartItemQuantity, removeCartItem } from '@/lib/cart';
-import { cookies } from 'next/headers';
+import { validateCartQuantity, jsonError, jsonSuccess } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,31 +11,49 @@ export async function PATCH(
 ) {
   try {
     const { id: cartItemId } = await params;
-    const body = await request.json();
-    const { quantity } = body;
+    if (!cartItemId) {
+      return jsonError('Cart item ID is required.', 400);
+    }
 
-    if (quantity === undefined) {
-      return NextResponse.json({ success: false, message: 'Quantity is required.' }, { status: 400 });
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonError('Invalid JSON payload.', 400);
+    }
+
+    const { quantity } = body || {};
+    if (quantity === undefined || quantity === null) {
+      return jsonError('Quantity is required.', 400);
     }
 
     const user = await getAuthenticatedUser(request);
-    const cookieStore = await cookies();
-    const guestToken = cookieStore.get('velyra_guest_token')?.value || null;
+    const guestToken = await getCookieValue(GUEST_COOKIE_NAME, request);
 
     const cart = await getOrCreateCart(user ? user.id : null, guestToken);
     if (!cart) {
-      return NextResponse.json({ success: false, message: 'Cart not found.' }, { status: 404 });
+      return jsonError('Cart session not found.', 404);
     }
 
-    const updatedCart = await updateCartItemQuantity(cart.id, cartItemId, parseInt(quantity, 10));
+    const numQuantity = Number(quantity);
 
-    return NextResponse.json({ success: true, cart: updatedCart });
+    // If 0, remove the item
+    if (numQuantity === 0) {
+      const updatedCart = await removeCartItem(cart.id, cartItemId);
+      return jsonSuccess({ cart: updatedCart });
+    }
+
+    const qtyCheck = validateCartQuantity(numQuantity, 99);
+    if (!qtyCheck.valid) {
+      return jsonError(qtyCheck.error || 'Invalid quantity.', 400);
+    }
+
+    const updatedCart = await updateCartItemQuantity(cart.id, cartItemId, qtyCheck.quantity);
+
+    return jsonSuccess({ cart: updatedCart });
   } catch (error: any) {
     console.error('Error updating cart item:', error);
-    return NextResponse.json(
-      { success: false, message: error.message || 'Failed to update item quantity.' },
-      { status: 400 }
-    );
+    return jsonError(error.message || 'Failed to update item quantity.', 400);
   }
 }
 
@@ -45,23 +63,23 @@ export async function DELETE(
 ) {
   try {
     const { id: cartItemId } = await params;
+    if (!cartItemId) {
+      return jsonError('Cart item ID is required.', 400);
+    }
+
     const user = await getAuthenticatedUser(request);
-    const cookieStore = await cookies();
-    const guestToken = cookieStore.get('velyra_guest_token')?.value || null;
+    const guestToken = await getCookieValue(GUEST_COOKIE_NAME, request);
 
     const cart = await getOrCreateCart(user ? user.id : null, guestToken);
     if (!cart) {
-      return NextResponse.json({ success: false, message: 'Cart not found.' }, { status: 404 });
+      return jsonError('Cart session not found.', 404);
     }
 
     const updatedCart = await removeCartItem(cart.id, cartItemId);
 
-    return NextResponse.json({ success: true, cart: updatedCart });
+    return jsonSuccess({ cart: updatedCart });
   } catch (error: any) {
     console.error('Error removing cart item:', error);
-    return NextResponse.json(
-      { success: false, message: 'Failed to remove item.' },
-      { status: 500 }
-    );
+    return jsonError('Failed to remove item.', 500);
   }
 }
