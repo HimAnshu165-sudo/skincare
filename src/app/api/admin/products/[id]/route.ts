@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireAdminUser } from '@/lib/auth';
 import { jsonError, jsonSuccess, sanitizeString } from '@/lib/validation';
@@ -196,6 +197,10 @@ export async function PATCH(
       request,
     });
 
+    try {
+      revalidateTag('products');
+    } catch {}
+
     return jsonSuccess({
       message: 'Product updated successfully.',
       product: updated,
@@ -272,6 +277,10 @@ export async function DELETE(
       metadata: { name: existing.name, sku: existing.sku, actionTaken: 'hard_deleted' },
       request,
     });
+
+    try {
+      revalidateTag('products');
+    } catch {}
 
     return jsonSuccess({
       message: 'Product deleted from database successfully.',

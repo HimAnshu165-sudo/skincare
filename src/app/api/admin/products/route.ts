@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireAdminUser } from '@/lib/auth';
 import { jsonError, jsonSuccess, sanitizeString } from '@/lib/validation';
@@ -248,6 +249,10 @@ export async function POST(request: Request) {
       metadata: { name: newProduct.name, sku: newProduct.sku, price: newProduct.price },
       request,
     });
+
+    try {
+      revalidateTag('products');
+    } catch {}
 
     return jsonSuccess({
       message: 'Product created successfully.',

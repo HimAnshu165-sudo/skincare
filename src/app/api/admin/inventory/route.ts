@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireAdminUser } from '@/lib/auth';
 import { jsonError, jsonSuccess, sanitizeString } from '@/lib/validation';
@@ -178,6 +179,10 @@ export async function PATCH(request: Request) {
       },
       request,
     });
+
+    try {
+      revalidateTag('products');
+    } catch {}
 
     return jsonSuccess({
       message: `Inventory updated for ${updated.name}.`,
