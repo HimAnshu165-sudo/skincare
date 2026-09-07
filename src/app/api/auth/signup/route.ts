@@ -113,6 +113,10 @@ export async function POST(request: Request) {
     }, 201);
   } catch (error: any) {
     console.error('Signup error:', error);
-    return jsonError('An unexpected error occurred while creating your account.', 500);
+    const message =
+      process.env.NODE_ENV === 'development'
+        ? `Signup failed: ${error?.message || 'Unknown server error'}`
+        : 'An unexpected error occurred while creating your account.';
+    return jsonError(message, 500);
   }
 }
