@@ -192,19 +192,78 @@ async function main() {
   }
   console.log(`Created ${coupons.length} coupons.`);
 
-  // 3. Seed Demo Order for tracking test
+  // 3. Seed Users (Admin & Customer)
+  const bcrypt = require('bcryptjs');
+  const adminPasswordHash = await bcrypt.hash('Admin123!', 10);
+  const adminMfaPinHash = await bcrypt.hash('123456', 10);
+  const customerPasswordHash = await bcrypt.hash('Customer123!', 10);
+
+  const adminUser = await prisma.user.upsert({
+    where: { email: 'admin@velyra.in' },
+    update: {
+      password: adminPasswordHash,
+      role: 'ADMIN',
+      adminMfaPin: adminMfaPinHash,
+    },
+    create: {
+      name: 'Velyra Store Admin',
+      email: 'admin@velyra.in',
+      password: adminPasswordHash,
+      phone: '9876543210',
+      role: 'ADMIN',
+      adminMfaPin: adminMfaPinHash,
+    },
+  });
+  console.log('Created/Updated Admin user:', adminUser.email);
+
+  const customerUser = await prisma.user.upsert({
+    where: { email: 'customer@velyra.in' },
+    update: {
+      password: customerPasswordHash,
+      role: 'CUSTOMER',
+    },
+    create: {
+      name: 'Aarav Sharma',
+      email: 'customer@velyra.in',
+      password: customerPasswordHash,
+      phone: '9876543210',
+      role: 'CUSTOMER',
+      addresses: {
+        create: [
+          {
+            fullName: 'Aarav Sharma',
+            phone: '9876543210',
+            addressLine1: '402, Lotus Grandeur, Veera Desai Road',
+            addressLine2: 'Andheri West',
+            city: 'Mumbai',
+            state: 'Maharashtra',
+            postalCode: '400053',
+            country: 'India',
+            addressType: 'HOME',
+            isDefault: true,
+          }
+        ]
+      }
+    },
+  });
+  console.log('Created/Updated Demo Customer user:', customerUser.email);
+
+  // 4. Seed Demo Order for tracking test
   const demoOrder = await prisma.order.create({
     data: {
       orderNumber: 'VEL-98241',
+      userId: customerUser.id,
       customerName: 'Aarav Sharma',
-      customerEmail: 'aarav.sharma@example.com',
+      customerEmail: 'customer@velyra.in',
       customerPhone: '9876543210',
       shippingAddress: JSON.stringify({
-        address: '402, Lotus Grandeur, Veera Desai Road',
-        apartment: 'Andheri West',
+        fullName: 'Aarav Sharma',
+        phone: '9876543210',
+        addressLine1: '402, Lotus Grandeur, Veera Desai Road',
+        addressLine2: 'Andheri West',
         city: 'Mumbai',
         state: 'Maharashtra',
-        pincode: '400053'
+        postalCode: '400053',
       }),
       paymentMethod: 'ONLINE',
       paymentStatus: 'PAID',
@@ -224,6 +283,26 @@ async function main() {
             quantity: 1,
             price: 899.0,
             volume: '50 ml / 1.69 fl. oz.'
+          }
+        ]
+      },
+      statusHistory: {
+        create: [
+          {
+            status: 'PLACED',
+            title: 'Order Placed',
+            description: 'Order successfully received and verified.',
+          },
+          {
+            status: 'CONFIRMED',
+            title: 'Order Confirmed',
+            description: 'Payment processed and order routed to fulfillment center.',
+          },
+          {
+            status: 'SHIPPED',
+            title: 'Dispatched via Courier',
+            description: 'Handed over to Delhivery Express Air.',
+            location: 'Mumbai Fulfillment Hub',
           }
         ]
       }

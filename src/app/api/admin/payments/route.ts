@@ -31,11 +31,11 @@ export async function GET(request: Request) {
 
     if (search) {
       where.OR = [
-        { razorpayOrderId: { contains: search, mode: 'insensitive' } },
-        { razorpayPaymentId: { contains: search, mode: 'insensitive' } },
-        { order: { orderNumber: { contains: search, mode: 'insensitive' } } },
-        { order: { customerName: { contains: search, mode: 'insensitive' } } },
-        { order: { customerEmail: { contains: search, mode: 'insensitive' } } },
+        { razorpayOrderId: { contains: search } },
+        { razorpayPaymentId: { contains: search } },
+        { order: { orderNumber: { contains: search } } },
+        { order: { customerName: { contains: search } } },
+        { order: { customerEmail: { contains: search } } },
       ];
     }
 

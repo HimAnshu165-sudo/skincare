@@ -71,6 +71,9 @@ export function formatCart(cart: any): FormattedCart {
     itemCount += qty;
     subtotal += price * qty;
 
+    const availableStock = product?.stockQuantity ?? 0;
+    const isAvailable = Boolean(product?.inStock && availableStock > 0);
+
     return {
       id: item.id,
       cartId: item.cartId,
@@ -83,8 +86,8 @@ export function formatCart(cart: any): FormattedCart {
         price,
         mrp: product?.mrp || 0,
         volume: product?.volume || '',
-        inStock: product?.inStock ?? true,
-        stockQuantity: product?.stockQuantity ?? 100,
+        inStock: isAvailable,
+        stockQuantity: availableStock,
         image: getProductPrimaryImage(product),
       },
     };
@@ -198,6 +201,10 @@ export async function addItemToCart(cartId: string, productId: string, quantity 
     throw new Error('Product is unavailable or out of stock.');
   }
 
+  if (product.stockQuantity <= 0) {
+    throw new Error('Product is currently out of stock.');
+  }
+
   const existing = await prisma.cartItem.findUnique({
     where: {
       cartId_productId: { cartId, productId },
@@ -231,13 +238,19 @@ export async function addItemToCart(cartId: string, productId: string, quantity 
 /**
  * Update item quantity with stock validation and ownership verification.
  */
-export async function updateCartItemQuantity(cartId: string, cartItemId: string, quantity: number) {
+export async function updateCartItemQuantity(cartId: string, cartItemIdOrProductId: string, quantity: number) {
   if (quantity <= 0) {
-    return removeCartItem(cartId, cartItemId);
+    return removeCartItem(cartId, cartItemIdOrProductId);
   }
 
   const item = await prisma.cartItem.findFirst({
-    where: { id: cartItemId, cartId },
+    where: {
+      cartId,
+      OR: [
+        { id: cartItemIdOrProductId },
+        { productId: cartItemIdOrProductId },
+      ],
+    },
     include: { product: { select: { stockQuantity: true } } },
   });
 
@@ -250,7 +263,7 @@ export async function updateCartItemQuantity(cartId: string, cartItemId: string,
   }
 
   await prisma.cartItem.update({
-    where: { id: cartItemId },
+    where: { id: item.id },
     data: { quantity },
   });
 
@@ -260,9 +273,15 @@ export async function updateCartItemQuantity(cartId: string, cartItemId: string,
 /**
  * Remove an item from cart strictly scoped to the cart.
  */
-export async function removeCartItem(cartId: string, cartItemId: string) {
+export async function removeCartItem(cartId: string, cartItemIdOrProductId: string) {
   await prisma.cartItem.deleteMany({
-    where: { id: cartItemId, cartId },
+    where: {
+      cartId,
+      OR: [
+        { id: cartItemIdOrProductId },
+        { productId: cartItemIdOrProductId },
+      ],
+    },
   });
 
   return getCartById(cartId);
