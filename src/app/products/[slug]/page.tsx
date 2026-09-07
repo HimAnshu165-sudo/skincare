@@ -15,7 +15,7 @@ interface PDPProps {
   params: Promise<{ slug: string }>;
 }
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 export async function generateMetadata({ params }: PDPProps): Promise<Metadata> {
   const { slug } = await params;

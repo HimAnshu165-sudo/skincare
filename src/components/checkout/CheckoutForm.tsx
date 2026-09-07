@@ -178,17 +178,6 @@ export function CheckoutForm() {
       return;
     }
 
-    // Guard against out-of-stock items in cart
-    const unavailableItem = items.find(
-      (i) => i.inStock === false || (i.stockQuantity ?? 0) <= 0 || i.quantity > (i.stockQuantity ?? 0)
-    );
-    if (unavailableItem) {
-      setErrorMsg(
-        `"${unavailableItem.name}" is no longer available in the requested quantity (Only ${unavailableItem.stockQuantity ?? 0} units available). Please return to your bag to adjust.`
-      );
-      return;
-    }
-
     // Require authentication to place order
     if (!user) {
       router.push(`/login?redirect=${encodeURIComponent('/checkout')}`);
@@ -649,7 +638,7 @@ export function CheckoutForm() {
       <div className="space-y-3 pt-2">
         <button
           type="submit"
-          disabled={loading || items.length === 0 || items.some((i) => i.inStock === false || (i.stockQuantity ?? 0) <= 0 || i.quantity > (i.stockQuantity ?? 0))}
+          disabled={loading || items.length === 0}
           className="w-full py-4 bg-brand-charcoal text-white rounded-xs text-xs sm:text-sm uppercase tracking-editorial font-medium hover:bg-black transition-all flex items-center justify-center gap-2 shadow-[0_6px_20px_rgba(0,0,0,0.12)] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? (

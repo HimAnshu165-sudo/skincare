@@ -74,7 +74,9 @@ export async function createOrder(params: CreateOrderParams) {
         throw new Error(`Insufficient stock for "${product.name}". Only ${product.stockQuantity} remaining.`);
       }
 
-      // Concurrency-safe atomic inventory decrement: strictly decrements by exact item.quantity
+      const newStock = product.stockQuantity - item.quantity;
+
+      // Concurrency-safe atomic inventory decrement: ensures stock never becomes negative
       const updateResult = await tx.product.updateMany({
         where: {
           id: product.id,
@@ -82,24 +84,12 @@ export async function createOrder(params: CreateOrderParams) {
         },
         data: {
           stockQuantity: { decrement: item.quantity },
+          inStock: newStock > 0,
         },
       });
 
       if (updateResult.count === 0) {
         throw new Error(`Insufficient stock for "${product.name}". The requested quantity is no longer available.`);
-      }
-
-      // Synchronize inStock flag based on authoritative post-decrement database quantity
-      const updatedProduct = await tx.product.findUnique({
-        where: { id: product.id },
-        select: { stockQuantity: true },
-      });
-
-      if (updatedProduct && updatedProduct.stockQuantity <= 0) {
-        await tx.product.update({
-          where: { id: product.id },
-          data: { inStock: false },
-        });
       }
 
       // Resolve primary image for snapshot

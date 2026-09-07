@@ -109,88 +109,66 @@ export default function CartPage() {
           {/* Left Items List */}
           <div className="lg:col-span-8 space-y-6">
             <div className="bg-surface-elevated rounded-sm border border-border-subtle shadow-sm divide-y divide-border-subtle">
-              {items.map((item) => {
-                const available = item.stockQuantity ?? 0;
-                const isOut = item.inStock === false || available <= 0;
-                const exceedsStock = item.quantity > available;
+              {items.map((item) => (
+                <div key={item.id} className="p-6 flex flex-col sm:flex-row gap-6 items-start sm:items-center">
+                  <div className="relative w-24 h-28 bg-surface-muted rounded-xs overflow-hidden flex-shrink-0 border border-border-subtle">
+                    <Image
+                      src={item.image}
+                      alt={item.name}
+                      fill
+                      className="object-contain p-2"
+                    />
+                  </div>
 
-                return (
-                  <div key={item.id} className={`p-6 flex flex-col sm:flex-row gap-6 items-start sm:items-center ${isOut ? 'bg-red-50/40' : ''}`}>
-                    <div className="relative w-24 h-28 bg-surface-muted rounded-xs overflow-hidden flex-shrink-0 border border-border-subtle">
-                      <Image
-                        src={item.image}
-                        alt={item.name}
-                        fill
-                        className="object-contain p-2"
-                      />
-                    </div>
-
-                    <div className="flex-1 space-y-1">
-                      <Link
-                        href={`/products/${item.slug}`}
-                        className="font-serif text-lg text-brand-charcoal hover:underline"
-                      >
-                        {item.name}
-                      </Link>
-                      <div className="text-xs text-brand-mineral">{item.volume}</div>
-                      <div className="text-xs font-semibold text-brand-charcoal pt-1">
-                        {formatPrice(item.price)} each
-                      </div>
-
-                      {/* Stock Warnings */}
-                      {isOut ? (
-                        <div className="text-xs font-bold text-red-700 uppercase pt-1">
-                          ⚠️ Out of Stock — Please remove from bag
-                        </div>
-                      ) : exceedsStock ? (
-                        <div className="text-xs font-bold text-amber-800 pt-1">
-                          ⚠️ Only {available} units available in stock
-                        </div>
-                      ) : available <= 5 ? (
-                        <div className="text-xs text-amber-700 pt-1">
-                          Only {available} units left in stock
-                        </div>
-                      ) : null}
-                    </div>
-
-                    {/* Quantity Controller */}
-                    <div className="flex items-center border border-border-strong rounded-xs bg-surface-elevated">
-                      <button
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                        className="p-2 text-brand-mineral hover:text-brand-charcoal"
-                        aria-label="Decrease quantity"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <span className="text-xs font-semibold px-3 text-brand-charcoal min-w-[2rem] text-center font-mono">
-                        {item.quantity}
-                      </span>
-                      <button
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        disabled={item.quantity >= available}
-                        className="p-2 text-brand-mineral hover:text-brand-charcoal disabled:opacity-30 disabled:cursor-not-allowed"
-                        aria-label="Increase quantity"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    {/* Total & Remove */}
-                    <div className="text-right sm:min-w-[100px] flex sm:flex-col justify-between items-end w-full sm:w-auto">
-                      <span className="font-serif text-base font-semibold text-brand-charcoal">
-                        {formatPrice(item.price * item.quantity)}
-                      </span>
-                      <button
-                        onClick={() => removeItem(item.id)}
-                        className="text-xs text-brand-mineral hover:text-red-700 flex items-center gap-1 mt-2"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Remove</span>
-                      </button>
+                  <div className="flex-1 space-y-1">
+                    <Link
+                      href={`/products/${item.slug}`}
+                      className="font-serif text-lg text-brand-charcoal hover:underline"
+                    >
+                      {item.name}
+                    </Link>
+                    <div className="text-xs text-brand-mineral">{item.volume} • SKU: {item.sku}</div>
+                    <div className="text-xs font-semibold text-brand-charcoal pt-1">
+                      {formatPrice(item.price)} each
                     </div>
                   </div>
-                );
-              })}
+
+                  {/* Quantity Controller */}
+                  <div className="flex items-center border border-border-strong rounded-xs bg-surface-elevated">
+                    <button
+                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                      className="p-2 text-brand-mineral hover:text-brand-charcoal"
+                      aria-label="Decrease quantity"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="text-xs font-semibold px-3 text-brand-charcoal">
+                      {item.quantity}
+                    </span>
+                    <button
+                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                      className="p-2 text-brand-mineral hover:text-brand-charcoal"
+                      aria-label="Increase quantity"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Total & Remove */}
+                  <div className="text-right sm:min-w-[100px] flex sm:flex-col justify-between items-end w-full sm:w-auto">
+                    <span className="font-serif text-base font-semibold text-brand-charcoal">
+                      {formatPrice(item.price * item.quantity)}
+                    </span>
+                    <button
+                      onClick={() => removeItem(item.id)}
+                      className="text-xs text-brand-mineral hover:text-red-700 flex items-center gap-1 mt-2"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Remove</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
 
             {/* Special Instructions Note */}
@@ -287,22 +265,13 @@ export default function CartPage() {
                 </p>
               </div>
 
-              {items.some((i) => i.inStock === false || (i.stockQuantity ?? 0) <= 0 || i.quantity > (i.stockQuantity ?? 0)) ? (
-                <button
-                  disabled
-                  className="w-full bg-surface-muted text-brand-mineral/60 py-4 text-xs uppercase tracking-widest font-semibold flex items-center justify-center gap-2 rounded-sm border border-border-subtle cursor-not-allowed"
-                >
-                  <span>Cannot Checkout Unavailable Items</span>
-                </button>
-              ) : (
-                <Link
-                  href="/checkout"
-                  className="w-full bg-brand-charcoal text-white py-4 text-xs uppercase tracking-widest font-semibold flex items-center justify-center gap-2 hover:bg-brand-mineral transition-colors rounded-sm shadow-md"
-                >
-                  <span>Proceed to Checkout</span>
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-              )}
+              <Link
+                href="/checkout"
+                className="w-full bg-brand-charcoal text-white py-4 text-xs uppercase tracking-widest font-semibold flex items-center justify-center gap-2 hover:bg-brand-mineral transition-colors rounded-sm shadow-md"
+              >
+                <span>Proceed to Checkout</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
           </div>
         </div>

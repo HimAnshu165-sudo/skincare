@@ -57,8 +57,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           image: ci.product.image,
           slug: ci.product.slug,
           volume: ci.product.volume,
-          inStock: ci.product.inStock,
-          stockQuantity: ci.product.stockQuantity,
         }));
         setItems(mappedItems);
       }
@@ -88,19 +86,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const openCart = () => setIsOpen(true);
   const closeCart = () => setIsOpen(false);
 
-  const addItem = async (product: Product, quantity = 1): Promise<void> => {
-    if (product.isUpcoming || !product.inStock || product.stockQuantity <= 0) return;
-
-    const safeQty = Math.max(1, Math.min(quantity, product.stockQuantity));
+  const addItem = async (product: Product, quantity = 1) => {
+    if (product.isUpcoming || !product.inStock) return;
 
     // Optimistic local update
     setItems((prev) => {
       const existing = prev.find((item) => item.productId === product.id);
       if (existing) {
-        const newQty = Math.min(existing.quantity + safeQty, product.stockQuantity);
         return prev.map((item) =>
           item.productId === product.id
-            ? { ...item, quantity: newQty, stockQuantity: product.stockQuantity, inStock: product.inStock }
+            ? { ...item, quantity: item.quantity + quantity }
             : item
         );
       }
@@ -113,12 +108,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           name: product.name,
           price: product.price,
           mrp: product.mrp,
-          quantity: safeQty,
+          quantity,
           image,
           slug: product.slug,
           volume: product.volume,
-          inStock: product.inStock,
-          stockQuantity: product.stockQuantity,
         },
       ];
     });
@@ -128,16 +121,16 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       id: product.id,
       name: product.name,
       price: product.price,
-      quantity: safeQty,
+      quantity,
       category: product.category,
     });
 
-    // Sync with server and wait for response
+    // Sync with server
     try {
       const res = await fetch('/api/cart/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId: product.id, quantity: safeQty }),
+        body: JSON.stringify({ productId: product.id, quantity }),
       });
       const data = await res.json();
       if (data.success && data.cart) {
@@ -151,14 +144,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           image: ci.product.image,
           slug: ci.product.slug,
           volume: ci.product.volume,
-          inStock: ci.product.inStock,
-          stockQuantity: ci.product.stockQuantity,
         }));
         setItems(mappedItems);
       }
     } catch (e) {
       console.error('Error syncing add item to cart:', e);
-      await fetchServerCart();
+      fetchServerCart();
     }
   };
 
@@ -192,14 +183,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           image: ci.product.image,
           slug: ci.product.slug,
           volume: ci.product.volume,
-          inStock: ci.product.inStock,
-          stockQuantity: ci.product.stockQuantity,
         }));
         setItems(mappedItems);
       }
     } catch (e) {
       console.error('Error removing item from cart:', e);
-      await fetchServerCart();
+      fetchServerCart();
     }
   };
 
@@ -209,22 +198,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const targetItem = items.find((i) => i.id === id || i.productId === id);
-    const maxAvailable = targetItem?.stockQuantity ?? 99;
-    const boundedQty = Math.min(quantity, maxAvailable);
-
     setItems((prev) =>
       prev.map((item) =>
-        item.id === id || item.productId === id ? { ...item, quantity: boundedQty } : item
+        item.id === id || item.productId === id ? { ...item, quantity } : item
       )
     );
 
     try {
-      const targetId = targetItem?.id || targetItem?.productId || id;
+      const targetItem = items.find((i) => i.id === id || i.productId === id);
+      const targetId = targetItem?.id || id;
       const res = await fetch(`/api/cart/items/${targetId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quantity: boundedQty }),
+        body: JSON.stringify({ quantity }),
       });
       const data = await res.json();
       if (data.success && data.cart) {
@@ -238,14 +224,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           image: ci.product.image,
           slug: ci.product.slug,
           volume: ci.product.volume,
-          inStock: ci.product.inStock,
-          stockQuantity: ci.product.stockQuantity,
         }));
         setItems(mappedItems);
       }
     } catch (e) {
       console.error('Error updating quantity:', e);
-      await fetchServerCart();
+      fetchServerCart();
     }
   };
 
