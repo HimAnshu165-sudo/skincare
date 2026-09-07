@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(data.user);
         // Trigger cart sync
         window.dispatchEvent(new CustomEvent('auth:login'));
-        return { success: true };
+        return { success: true, user: data.user };
       }
       return { success: false, message: data.message || 'Login failed.' };
     } catch (err: any) {
