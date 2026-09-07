@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getAuthenticatedUser } from '@/lib/auth';
-import { getUserOrders } from '@/lib/orders';
+import { getAuthenticatedUser, requireAuthenticatedUser } from '@/lib/auth';
+import { getUserOrders, createOrder } from '@/lib/orders';
+import { prisma } from '@/lib/prisma';
+import { isValidEmail, isValidPhone, sanitizeString, validateCartQuantity, jsonError, jsonSuccess } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,10 +10,7 @@ export async function GET(request: Request) {
   try {
     const user = await getAuthenticatedUser(request);
     if (!user) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      );
+      return jsonError('Unauthorized: Please sign in to view your orders.', 401);
     }
 
     const orders = await getUserOrders(user.id);
@@ -32,12 +31,124 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({ success: true, orders: formatted });
+    return jsonSuccess({ orders: formatted });
   } catch (error: any) {
     console.error('Error fetching user orders:', error);
-    return NextResponse.json(
-      { success: false, message: 'Failed to retrieve orders.' },
-      { status: 500 }
-    );
+    return jsonError('Failed to retrieve orders.', 500);
   }
 }
+
+export async function POST(request: Request) {
+  try {
+    const auth = await requireAuthenticatedUser(request);
+    if (auth.status !== 200 || !auth.user) {
+      return jsonError(auth.error || 'Authentication required to place an order.', auth.status);
+    }
+
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonError('Invalid JSON payload.', 400);
+    }
+
+    const {
+      customerName,
+      customerEmail,
+      customerPhone,
+      shippingAddress,
+      paymentMethod,
+      items,
+      couponCode,
+      notes,
+    } = body || {};
+
+    const user = auth.user;
+    const sanitizedName = sanitizeString(customerName || user.name, 100);
+    const sanitizedEmail = typeof customerEmail === 'string' ? customerEmail.trim().toLowerCase() : user.email;
+    const sanitizedPhone = sanitizeString(customerPhone || user.phone || '', 20);
+
+    if (!sanitizedName || sanitizedName.length < 2) {
+      return jsonError('Please provide your full name.', 400);
+    }
+
+    if (!isValidEmail(sanitizedEmail)) {
+      return jsonError('Please provide a valid email address.', 400);
+    }
+
+    if (!isValidPhone(sanitizedPhone)) {
+      return jsonError('Please provide a valid 10-digit mobile number starting with 6, 7, 8, or 9.', 400);
+    }
+
+    if (!shippingAddress || typeof shippingAddress !== 'object') {
+      return jsonError('Please provide a complete shipping address.', 400);
+    }
+
+    const addrLine1 = sanitizeString(shippingAddress.addressLine1 || shippingAddress.address, 200);
+    const addrCity = sanitizeString(shippingAddress.city, 100);
+    const addrPostal = sanitizeString(shippingAddress.postalCode || shippingAddress.pincode, 10);
+
+    if (!addrLine1 || !addrCity || !addrPostal) {
+      return jsonError('Please complete all required delivery address fields.', 400);
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return jsonError('Your cart is empty. Please add formulations to order.', 400);
+    }
+
+    const sanitizedItems: Array<{ productId: string; quantity: number }> = [];
+    for (const item of items) {
+      if (!item || !item.productId || typeof item.productId !== 'string') {
+        return jsonError('Invalid product item in order.', 400);
+      }
+      const qtyCheck = validateCartQuantity(item.quantity, 99);
+      if (!qtyCheck.valid) {
+        return jsonError(`Invalid quantity for product ${item.productId}.`, 400);
+      }
+      sanitizedItems.push({
+        productId: item.productId,
+        quantity: qtyCheck.quantity,
+      });
+    }
+
+    const order = await createOrder({
+      userId: user.id, // Strictly derived from verified session
+      customerName: sanitizedName,
+      customerEmail: sanitizedEmail,
+      customerPhone: sanitizedPhone,
+      shippingAddress: {
+        fullName: sanitizeString(shippingAddress.fullName || sanitizedName, 100),
+        phone: sanitizeString(shippingAddress.phone || sanitizedPhone, 20),
+        addressLine1: addrLine1,
+        addressLine2: sanitizeString(shippingAddress.addressLine2 || shippingAddress.apartment, 200) || undefined,
+        city: addrCity,
+        state: sanitizeString(shippingAddress.state || 'India', 100),
+        postalCode: addrPostal,
+        country: sanitizeString(shippingAddress.country || 'India', 50),
+      },
+      paymentMethod: paymentMethod === 'ONLINE' ? 'ONLINE' : 'COD',
+      items: sanitizedItems,
+      couponCode: couponCode ? sanitizeString(couponCode, 30) : null,
+      notes: notes ? sanitizeString(notes, 500) : null,
+    });
+
+    return jsonSuccess({
+      order: {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        total: order.total,
+        subtotal: order.subtotal,
+        discount: order.discount,
+        shippingFee: order.shippingFee,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus,
+        orderStatus: order.orderStatus,
+        items: order.items,
+      },
+    }, 201);
+  } catch (error: any) {
+    console.error('Error in POST /api/orders:', error);
+    return jsonError(error.message || 'Failed to place order.', 400);
+  }
+}
+

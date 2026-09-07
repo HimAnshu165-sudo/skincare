@@ -4,13 +4,15 @@ import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { ArrowRight, Lock, Mail, User as UserIcon, Phone, Sparkles, AlertCircle, Loader2, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { useProcessing } from '@/context/ProcessingContext';
+import { ArrowRight, Lock, Mail, User as UserIcon, Phone, Sparkles, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
 
 function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect') || '/account';
   const { signup, user } = useAuth();
+  const { showProcessing, hideProcessing } = useProcessing();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -21,6 +23,13 @@ function SignupForm() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Clean up global processing overlay on component unmount
+  React.useEffect(() => {
+    return () => {
+      hideProcessing();
+    };
+  }, [hideProcessing]);
 
   React.useEffect(() => {
     if (user) {
@@ -50,8 +59,8 @@ function SignupForm() {
     }
 
     if (trimmedPhone) {
-      if (trimmedPhone.length !== 10) {
-        setError('Please enter a valid 10-digit mobile number.');
+      if (!/^[6-9]\d{9}$/.test(trimmedPhone)) {
+        setError('Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.');
         return;
       }
     }
@@ -67,13 +76,25 @@ function SignupForm() {
     }
 
     setSubmitting(true);
-    const result = await signup(trimmedName, trimmedEmail, password, trimmedPhone || undefined);
-    setSubmitting(false);
+    showProcessing('Creating your account...', 'Configuring your personalized skincare profile and linking your bag...');
 
-    if (result.success) {
-      router.push(redirectUrl);
-    } else {
-      setError(result.message || 'Failed to create account.');
+    try {
+      const result = await signup(trimmedName, trimmedEmail, password, trimmedPhone || undefined);
+      if (result.success) {
+        hideProcessing();
+        setSubmitting(false);
+        router.push(redirectUrl);
+      } else {
+        hideProcessing();
+        setSubmitting(false);
+        setError(result.message || 'Failed to create account.');
+      }
+    } catch {
+      hideProcessing();
+      setSubmitting(false);
+      setError('A network error occurred while creating your account.');
+    } finally {
+      hideProcessing();
     }
   };
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthenticatedUser } from '@/lib/auth';
+import { getAuthenticatedUser, requireAuthenticatedUser } from '@/lib/auth';
 import { createOrder } from '@/lib/orders';
 import { prisma } from '@/lib/prisma';
 import { isValidEmail, isValidPhone, sanitizeString, validateCartQuantity, jsonError, jsonSuccess } from '@/lib/validation';
@@ -8,7 +8,12 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const user = await getAuthenticatedUser(request);
+    const auth = await requireAuthenticatedUser(request);
+    if (auth.status !== 200 || !auth.user) {
+      return jsonError(auth.error || 'Authentication required to place an order. Please sign in or create an account.', 401);
+    }
+    const user = auth.user;
+
     let body: any;
     try {
       body = await request.json();
@@ -41,7 +46,7 @@ export async function POST(request: Request) {
     }
 
     if (!isValidPhone(sanitizedPhone)) {
-      return jsonError('Please provide a valid 10-digit mobile number.', 400);
+      return jsonError('Please provide a valid 10-digit mobile number starting with 6, 7, 8, or 9.', 400);
     }
 
     if (!shippingAddress || typeof shippingAddress !== 'object') {
@@ -78,7 +83,7 @@ export async function POST(request: Request) {
 
     // Call transactional order creation engine with server-side price validation
     const order = await createOrder({
-      userId: user ? user.id : null,
+      userId: user.id,
       customerName: sanitizedName,
       customerEmail: sanitizedEmail,
       customerPhone: sanitizedPhone,

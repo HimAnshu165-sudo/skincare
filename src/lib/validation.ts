@@ -24,15 +24,17 @@ export function isValidPassword(password: unknown, minLength = 6): boolean {
 }
 
 /**
- * Validates mobile phone number format (strictly 10 digits).
+ * Validates mobile phone number format (strictly 10 digits starting with 6, 7, 8, or 9).
  */
 export function isValidPhone(phone: unknown): boolean {
   if (typeof phone !== 'string') return false;
   const digitsOnly = phone.trim().replace(/\D/g, '');
-  if (!digitsOnly) return true; // Optional if empty
-  // Standard 10-digit mobile number (or 10 digits prefixed by 91 or 0)
-  if (digitsOnly.length === 10) return /^[6-9]\d{9}$/.test(digitsOnly) || /^\d{10}$/.test(digitsOnly);
+  if (!digitsOnly) return false;
+  // Standard 10-digit mobile number (starts with 6-9)
+  if (digitsOnly.length === 10) return /^[6-9]\d{9}$/.test(digitsOnly);
+  // 12-digit number with 91 country code prefix (10 digits starting with 6-9)
   if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) return /^[6-9]\d{9}$/.test(digitsOnly.slice(2));
+  // 11-digit number with 0 trunk prefix (10 digits starting with 6-9)
   if (digitsOnly.length === 11 && digitsOnly.startsWith('0')) return /^[6-9]\d{9}$/.test(digitsOnly.slice(1));
   return false;
 }

@@ -54,7 +54,7 @@ export async function PATCH(request: Request) {
     if (phone !== undefined) {
       const sanitizedPhone = sanitizeString(phone, 20);
       if (sanitizedPhone && !isValidPhone(sanitizedPhone)) {
-        return jsonError('Please enter a valid 10-digit mobile number.', 400);
+        return jsonError('Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.', 400);
       }
       dataToUpdate.phone = sanitizedPhone ? normalizePhone(sanitizedPhone) : null;
     }

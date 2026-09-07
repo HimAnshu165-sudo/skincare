@@ -23,82 +23,71 @@ export async function GET(request: Request) {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
     sevenDaysAgo.setHours(0, 0, 0, 0);
 
-    // Parallel database aggregation queries
+    // Optimized parallel database aggregation queries (6 targeted queries instead of 18)
     const [
-      totalOrders,
-      placedOrders,
-      confirmedOrders,
-      processingOrders,
-      packedOrders,
-      shippedOrders,
-      outForDeliveryOrders,
-      deliveredOrders,
-      cancelledOrders,
+      ordersByStatusGroup,
+      totalRevenueAgg,
+      todayRevenueAgg,
       totalCustomers,
-      totalProducts,
-      lowStockProductsCount,
-      outOfStockProductsCount,
-      todayOrdersList,
-      allValidOrdersForRevenue,
+      productsStats,
+      last7DaysOrders,
       recentOrdersRaw,
       lowStockProductsRaw,
       recentCustomersRaw,
     ] = await Promise.all([
-      // Total orders
-      prisma.order.count(),
-
-      // Orders by status
-      prisma.order.count({ where: { orderStatus: 'PLACED' } }),
-      prisma.order.count({ where: { orderStatus: 'CONFIRMED' } }),
-      prisma.order.count({ where: { orderStatus: 'PROCESSING' } }),
-      prisma.order.count({ where: { orderStatus: 'PACKED' } }),
-      prisma.order.count({ where: { orderStatus: 'SHIPPED' } }),
-      prisma.order.count({ where: { orderStatus: 'OUT_FOR_DELIVERY' } }),
-      prisma.order.count({ where: { orderStatus: 'DELIVERED' } }),
-      prisma.order.count({ where: { orderStatus: 'CANCELLED' } }),
-
-      // Total customers
-      prisma.user.count({ where: { role: 'CUSTOMER' } }),
-
-      // Products metrics
-      prisma.product.count(),
-      prisma.product.count({
-        where: {
-          stockQuantity: { lte: LOW_STOCK_THRESHOLD, gt: 0 },
-          inStock: true,
-        },
-      }),
-      prisma.product.count({
-        where: {
-          OR: [{ stockQuantity: { lte: 0 } }, { inStock: false }],
-        },
+      // 1. Grouped Order status counts in a single query
+      prisma.order.groupBy({
+        by: ['orderStatus'],
+        _count: { id: true },
       }),
 
-      // Today's orders
-      prisma.order.findMany({
+      // 2. All-time revenue & valid orders aggregate
+      prisma.order.aggregate({
+        where: {
+          orderStatus: { not: 'CANCELLED' },
+          paymentStatus: { not: 'FAILED' },
+        },
+        _sum: { total: true },
+        _count: { id: true },
+      }),
+
+      // 3. Today's orders & revenue aggregate
+      prisma.order.aggregate({
         where: {
           createdAt: { gte: startOfToday },
           orderStatus: { not: 'CANCELLED' },
           paymentStatus: { not: 'FAILED' },
         },
-        select: { total: true },
+        _sum: { total: true },
+        _count: { id: true },
       }),
 
-      // All non-cancelled, non-failed orders for revenue calculation
+      // 4. Total customers count
+      prisma.user.count({ where: { role: 'CUSTOMER' } }),
+
+      // 5. Products stats (total, low stock, out of stock)
+      prisma.product.findMany({
+        select: {
+          id: true,
+          stockQuantity: true,
+          inStock: true,
+        },
+      }),
+
+      // 6. Last 7 days orders specifically for revenue trend chart
       prisma.order.findMany({
         where: {
+          createdAt: { gte: sevenDaysAgo },
           orderStatus: { not: 'CANCELLED' },
           paymentStatus: { not: 'FAILED' },
         },
         select: {
           total: true,
           createdAt: true,
-          paymentStatus: true,
-          orderStatus: true,
         },
       }),
 
-      // Recent 10 orders
+      // 7. Recent 10 orders
       prisma.order.findMany({
         take: 10,
         orderBy: { createdAt: 'desc' },
@@ -108,7 +97,7 @@ export async function GET(request: Request) {
         },
       }),
 
-      // Low stock product list
+      // 8. Low stock product list
       prisma.product.findMany({
         where: {
           stockQuantity: { lte: LOW_STOCK_THRESHOLD },
@@ -123,7 +112,7 @@ export async function GET(request: Request) {
         },
       }),
 
-      // Recent customers
+      // 9. Recent customers
       prisma.user.findMany({
         where: { role: 'CUSTOMER' },
         orderBy: { createdAt: 'desc' },
@@ -139,10 +128,38 @@ export async function GET(request: Request) {
       }),
     ]);
 
-    // Calculate total revenue
-    const totalRevenue = allValidOrdersForRevenue.reduce((sum, ord) => sum + (ord.total || 0), 0);
-    const todayOrders = todayOrdersList.length;
-    const todayRevenue = todayOrdersList.reduce((sum, ord) => sum + (ord.total || 0), 0);
+    // Parse status counts from groupBy
+    const statusCountMap: Record<string, number> = {};
+    let totalOrders = 0;
+    for (const group of ordersByStatusGroup) {
+      statusCountMap[group.orderStatus] = group._count.id;
+      totalOrders += group._count.id;
+    }
+
+    const placedOrders = statusCountMap['PLACED'] || 0;
+    const confirmedOrders = statusCountMap['CONFIRMED'] || 0;
+    const processingOrders = statusCountMap['PROCESSING'] || 0;
+    const packedOrders = statusCountMap['PACKED'] || 0;
+    const shippedOrders = statusCountMap['SHIPPED'] || 0;
+    const outForDeliveryOrders = statusCountMap['OUT_FOR_DELIVERY'] || 0;
+    const deliveredOrders = statusCountMap['DELIVERED'] || 0;
+    const cancelledOrders = statusCountMap['CANCELLED'] || 0;
+
+    // Parse product stats
+    const totalProducts = productsStats.length;
+    let lowStockProductsCount = 0;
+    let outOfStockProductsCount = 0;
+    for (const p of productsStats) {
+      if (!p.inStock || p.stockQuantity <= 0) {
+        outOfStockProductsCount++;
+      } else if (p.stockQuantity <= LOW_STOCK_THRESHOLD) {
+        lowStockProductsCount++;
+      }
+    }
+
+    const totalRevenue = totalRevenueAgg._sum.total || 0;
+    const todayOrders = todayRevenueAgg._count.id || 0;
+    const todayRevenue = todayRevenueAgg._sum.total || 0;
 
     // Calculate 7-day revenue trend
     const last7DaysMap = new Map<string, { date: string; revenue: number; orders: number }>();
@@ -154,7 +171,7 @@ export async function GET(request: Request) {
       last7DaysMap.set(key, { date: dayLabel, revenue: 0, orders: 0 });
     }
 
-    for (const order of allValidOrdersForRevenue) {
+    for (const order of last7DaysOrders) {
       const orderDateKey = new Date(order.createdAt).toISOString().split('T')[0];
       if (last7DaysMap.has(orderDateKey)) {
         const entry = last7DaysMap.get(orderDateKey)!;

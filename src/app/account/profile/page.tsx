@@ -4,10 +4,12 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useProcessing } from '@/context/ProcessingContext';
 import { ArrowLeft, User, Lock, Phone, Check, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
 
 export default function AccountProfilePage() {
   const { user, loading, refreshUser } = useAuth();
+  const { showProcessing, hideProcessing } = useProcessing();
   const router = useRouter();
 
   const [name, setName] = useState('');
@@ -39,8 +41,8 @@ export default function AccountProfilePage() {
     setErrorMsg('');
 
     const cleanedPhone = phone.trim().replace(/\D/g, '');
-    if (cleanedPhone && cleanedPhone.length !== 10) {
-      setErrorMsg('Please enter a valid 10-digit mobile number.');
+    if (cleanedPhone && !/^[6-9]\d{9}$/.test(cleanedPhone)) {
+      setErrorMsg('Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.');
       return;
     }
 
@@ -55,6 +57,7 @@ export default function AccountProfilePage() {
     }
 
     setSaving(true);
+    showProcessing('Saving profile changes...', 'Updating your credentials in secure database...');
 
     try {
       const payload: any = { name: name.trim(), phone: cleanedPhone || null };
@@ -78,6 +81,7 @@ export default function AccountProfilePage() {
     } catch {
       setErrorMsg('Network error updating profile.');
     } finally {
+      hideProcessing();
       setSaving(false);
     }
   };
