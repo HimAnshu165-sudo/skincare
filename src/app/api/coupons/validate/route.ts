@@ -1,9 +1,23 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rateLimit';
 
 export async function POST(request: Request) {
   try {
-    const { code, subtotal } = await request.json();
+    const ip = getClientIp(request);
+    const rateCheck = await checkRateLimit(`coupon:validate:ip:${ip}`, 15, 60000);
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.resetSeconds, 'Too many coupon validation attempts. Please try again later.');
+    }
+
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ valid: false, message: 'Invalid JSON payload.' }, { status: 400 });
+    }
+
+    const { code, subtotal } = body || {};
     if (!code) {
       return NextResponse.json(
         { valid: false, message: 'Please provide a coupon code.' },

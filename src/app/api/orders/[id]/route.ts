@@ -1,21 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/auth';
-import { getUserOrderById, getOrderForTracking } from '@/lib/orders';
+import { getUserOrderById, getAdminOrderById } from '@/lib/orders';
 import { jsonError, jsonSuccess } from '@/lib/validation';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
-
-function maskPhone(phone: string): string {
-  if (!phone || phone.length < 4) return '****';
-  return '******' + phone.slice(-4);
-}
-
-function maskEmail(email: string): string {
-  if (!email || !email.includes('@')) return '***@***.***';
-  const [name, domain] = email.split('@');
-  const maskedName = name.length > 2 ? `${name[0]}***${name[name.length - 1]}` : `${name[0]}***`;
-  return `${maskedName}@${domain}`;
-}
 
 export async function GET(
   request: Request,
@@ -23,38 +12,35 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    if (!id) {
-      return jsonError('Order ID or query is required.', 400);
+    if (!id || typeof id !== 'string') {
+      return jsonError('Order ID or order number is required.', 400);
     }
 
+    // Strictly derive user identity from the server-side authenticated session
+    // Never trust client userId, query userId, or request body userId
     const user = await getAuthenticatedUser(request);
+    if (!user) {
+      return jsonError('Unauthorized: Authentication required to track or view order details.', 401);
+    }
+
+    const rateCheck = await checkRateLimit(`orders:detail:${user.id}`, 60, 60000);
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.resetSeconds, 'Too many order status requests. Please try again later.');
+    }
 
     let order = null;
-    let isFullAccess = false;
 
-    if (user) {
-      if (user.role === 'ADMIN') {
-        // Admin can inspect any order
-        order = await getOrderForTracking(id);
-        if (order) isFullAccess = true;
-      } else {
-        // Authenticated customer: strictly isolate by userId. Do NOT fall back to other users' orders.
-        order = await getUserOrderById(id, user.id);
-        if (!order) {
-          return jsonError('Order not found or access denied.', 404);
-        }
-        isFullAccess = true;
-      }
+    if (user.role === 'ADMIN') {
+      // Authorized admin flow: can inspect orders across the system
+      order = await getAdminOrderById(id);
     } else {
-      // Unauthenticated guest tracking lookup: only allow lookup by Order Number
-      if (!id.startsWith('VEL-')) {
-        return jsonError('Order not found or unauthorized.', 404);
-      }
-      order = await getOrderForTracking(id);
+      // Authenticated customer: database ownership check (order.userId === session.userId)
+      // Never returns another customer's order even if requestedOrderId/orderNumber is known
+      order = await getUserOrderById(id, user.id);
     }
 
     if (!order) {
-      return jsonError('Order not found or unauthorized.', 404);
+      return jsonError('Order not found or access denied.', 404);
     }
 
     let shippingAddress: any = {};
@@ -67,33 +53,15 @@ export async function GET(
       shippingAddress = order.shippingAddress;
     }
 
-    // If unauthenticated public tracking, sanitize sensitive customer details
-    const sanitizedCustomerPhone = isFullAccess
-      ? order.customerPhone
-      : maskPhone(order.customerPhone);
-
-    const sanitizedCustomerEmail = isFullAccess
-      ? order.customerEmail
-      : maskEmail(order.customerEmail);
-
-    const sanitizedAddress = isFullAccess
-      ? shippingAddress
-      : {
-          address: shippingAddress.addressLine1 || shippingAddress.address || 'Delivered to address on file',
-          apartment: shippingAddress.addressLine2 || shippingAddress.apartment || '',
-          city: shippingAddress.city || '',
-          state: shippingAddress.state || '',
-          pincode: shippingAddress.postalCode || shippingAddress.pincode || '',
-        };
-
+    // Expose only safe fields, strictly omitting internal payment signatures, raw payloads, or secrets
     return jsonSuccess({
       order: {
         id: order.id,
         orderNumber: order.orderNumber,
-        customerName: isFullAccess ? order.customerName : (order.customerName ? `${order.customerName.split(' ')[0]} ***` : 'Customer'),
-        customerEmail: sanitizedCustomerEmail,
-        customerPhone: sanitizedCustomerPhone,
-        shippingAddress: sanitizedAddress,
+        customerName: order.customerName,
+        customerEmail: order.customerEmail,
+        customerPhone: order.customerPhone,
+        shippingAddress,
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
         orderStatus: order.orderStatus,
@@ -110,7 +78,7 @@ export async function GET(
       },
     });
   } catch (error: any) {
-    console.error('Error tracking order:', error);
+    console.error('Error retrieving order:', error);
     return jsonError('Server error retrieving order.', 500);
   }
 }

@@ -3,6 +3,7 @@ import { listBlobMedia, deleteFromBlob } from '@/lib/blob';
 import { requireAdminUser } from '@/lib/auth';
 import { jsonError, jsonSuccess } from '@/lib/validation';
 import { logAdminAction } from '@/lib/audit';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +36,11 @@ export async function DELETE(request: Request) {
     const auth = await requireAdminUser(request);
     if (auth.status !== 200 || !auth.user) {
       return jsonError(auth.error || 'Unauthorized', auth.status);
+    }
+
+    const rateCheck = await checkRateLimit(`admin:media:delete:${auth.user.id}`, 30, 60000);
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.resetSeconds, 'Media deletion rate limit exceeded.');
     }
 
     const { searchParams } = new URL(request.url);

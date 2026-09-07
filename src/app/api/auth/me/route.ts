@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAuthenticatedUser, hashPassword } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { sanitizeString, isValidPhone, normalizePhone, isValidPassword, jsonError, jsonSuccess } from '@/lib/validation';
+import { checkDualRateLimit, getClientIp, rateLimitResponse } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +31,19 @@ export async function PATCH(request: Request) {
     const user = await getAuthenticatedUser(request);
     if (!user) {
       return jsonError('Unauthorized', 401);
+    }
+
+    const ip = getClientIp(request);
+    const rateCheck = await checkDualRateLimit(
+      `auth:me:user:${user.id}`,
+      10,
+      60000,
+      `auth:me:ip:${ip}`,
+      10,
+      60000
+    );
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.resetSeconds, 'Too many profile update requests. Please try again later.');
     }
 
     let body: any;

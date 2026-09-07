@@ -4,11 +4,18 @@ import { getAuthenticatedUser, getCookieValue, GUEST_COOKIE_NAME } from '@/lib/a
 import { getOrCreateCart, addItemToCart } from '@/lib/cart';
 import { prisma } from '@/lib/prisma';
 import { validateCartQuantity, jsonError, jsonSuccess } from '@/lib/validation';
+import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request);
+    const rateCheck = await checkRateLimit(`cart:items:ip:${ip}`, 60, 60000);
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.resetSeconds, 'Too many cart requests. Please try again later.');
+    }
+
     let body: any;
     try {
       body = await request.json();

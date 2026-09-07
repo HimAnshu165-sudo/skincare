@@ -87,10 +87,12 @@ export interface Order {
   razorpayPaymentId?: string | null;
   trackingNumber?: string | null;
   courierName?: string | null;
+  trackingUrl?: string | null;
   notes?: string | null;
   items: OrderItem[];
+  statusHistory?: any[];
   createdAt: string | Date;
-  updatedAt: string | Date;
+  updatedAt?: string | Date;
 }
 
 export interface Coupon {

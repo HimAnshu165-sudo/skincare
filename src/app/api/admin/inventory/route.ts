@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { requireAdminUser } from '@/lib/auth';
 import { jsonError, jsonSuccess, sanitizeString } from '@/lib/validation';
 import { logAdminAction } from '@/lib/audit';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -109,6 +110,11 @@ export async function PATCH(request: Request) {
     const auth = await requireAdminUser(request);
     if (auth.status !== 200 || !auth.user) {
       return jsonError(auth.error || 'Unauthorized', auth.status);
+    }
+
+    const rateCheck = await checkRateLimit(`admin:inventory:update:${auth.user.id}`, 40, 60000);
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.resetSeconds, 'Inventory update rate limit exceeded.');
     }
 
     let body: any;
