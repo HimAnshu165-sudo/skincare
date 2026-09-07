@@ -42,7 +42,6 @@ export interface CartItem {
   volume: string;
   sku?: string;
   inStock?: boolean;
-  stockQuantity?: number;
 }
 
 export interface ShippingAddress {

@@ -28,7 +28,7 @@ export function StickyPurchaseBar({ product }: StickyPurchaseBarProps) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  if (!show || product.isUpcoming || !product.inStock || (product.stockQuantity ?? 0) <= 0) return null;
+  if (!show || product.isUpcoming || !product.inStock) return null;
 
   const images = Array.isArray(product.images)
     ? product.images

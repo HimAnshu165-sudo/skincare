@@ -46,41 +46,30 @@ export function OrderSummary() {
 
       {/* Item List */}
       <div className="space-y-4 max-h-72 overflow-y-auto pr-1">
-        {items.map((item) => {
-          const available = item.stockQuantity ?? 0;
-          const isOut = item.inStock === false || available <= 0;
-          const exceedsStock = item.quantity > available;
-
-          return (
-            <div key={item.id} className={`flex gap-3.5 items-center ${isOut ? 'opacity-70 bg-red-50/50 p-1.5 rounded-xs' : ''}`}>
-              <div className="relative w-14 h-16 bg-surface-muted rounded-xs overflow-hidden flex-shrink-0 border border-border-subtle">
-                <Image
-                  src={item.image}
-                  alt={item.name}
-                  fill
-                  className="object-contain p-1"
-                />
-                <span className="absolute -top-1 -right-1 bg-brand-charcoal text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-semibold font-mono">
-                  {item.quantity}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="font-serif text-xs font-medium text-brand-charcoal truncate">
-                  {item.name}
-                </h4>
-                <div className="text-[11px] text-brand-mineral">{item.volume}</div>
-                {isOut ? (
-                  <span className="text-[10px] font-bold text-red-700 block">Out of stock</span>
-                ) : exceedsStock ? (
-                  <span className="text-[10px] font-bold text-amber-800 block">Only {available} available</span>
-                ) : null}
-              </div>
-              <div className="text-xs font-semibold text-brand-charcoal font-mono">
-                {formatPrice(item.price * item.quantity)}
-              </div>
+        {items.map((item) => (
+          <div key={item.id} className="flex gap-3.5 items-center">
+            <div className="relative w-14 h-16 bg-surface-muted rounded-xs overflow-hidden flex-shrink-0 border border-border-subtle">
+              <Image
+                src={item.image}
+                alt={item.name}
+                fill
+                className="object-contain p-1"
+              />
+              <span className="absolute -top-1 -right-1 bg-brand-charcoal text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-semibold">
+                {item.quantity}
+              </span>
             </div>
-          );
-        })}
+            <div className="flex-1 min-w-0">
+              <h4 className="font-serif text-xs font-medium text-brand-charcoal truncate">
+                {item.name}
+              </h4>
+              <div className="text-[11px] text-brand-mineral">{item.volume}</div>
+            </div>
+            <div className="text-xs font-semibold text-brand-charcoal">
+              {formatPrice(item.price * item.quantity)}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Coupon Field */}

@@ -53,11 +53,11 @@ export async function GET(request: Request) {
 
     if (search) {
       where.OR = [
-        { orderNumber: { contains: search } },
-        { customerName: { contains: search } },
-        { customerEmail: { contains: search } },
+        { orderNumber: { contains: search, mode: 'insensitive' } },
+        { customerName: { contains: search, mode: 'insensitive' } },
+        { customerEmail: { contains: search, mode: 'insensitive' } },
         { customerPhone: { contains: search } },
-        { trackingNumber: { contains: search } },
+        { trackingNumber: { contains: search, mode: 'insensitive' } },
       ];
     }
 

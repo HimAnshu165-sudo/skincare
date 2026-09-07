@@ -25,37 +25,22 @@ export function ProductInfo({ product }: ProductInfoProps) {
   const { addItem } = useCart();
   const router = useRouter();
   const [quantity, setQuantity] = useState(1);
-  const [isAdding, setIsAdding] = useState(false);
   const [pincode, setPincode] = useState('');
   const [pincodeStatus, setPincodeStatus] = useState<{ checked: boolean; valid?: boolean; message?: string }>({
     checked: false,
   });
 
-  const availableStock = product.stockQuantity ?? 0;
-  const isOutOfStock = !product.inStock || availableStock <= 0;
-  const isUpcoming = Boolean(product.isUpcoming);
-
   const discountPercent = calculateDiscount(product.mrp, product.price);
 
-  const handleAddToCart = async () => {
-    if (isUpcoming || isOutOfStock || isAdding) return;
-    setIsAdding(true);
-    try {
-      await addItem(product, quantity);
-    } finally {
-      setIsAdding(false);
-    }
+  const handleAddToCart = () => {
+    if (product.isUpcoming || !product.inStock) return;
+    addItem(product, quantity);
   };
 
-  const handleBuyNow = async () => {
-    if (isUpcoming || isOutOfStock || isAdding) return;
-    setIsAdding(true);
-    try {
-      await addItem(product, quantity);
-      router.push('/checkout');
-    } finally {
-      setIsAdding(false);
-    }
+  const handleBuyNow = () => {
+    if (product.isUpcoming || !product.inStock) return;
+    addItem(product, quantity);
+    router.push('/checkout');
   };
 
   const handleCheckPincode = (e: React.FormEvent) => {
@@ -98,11 +83,6 @@ export function ProductInfo({ product }: ProductInfoProps) {
             Hero Formulation
           </span>
         )}
-        {isOutOfStock && !isUpcoming && (
-          <span className="bg-red-100 text-red-800 border border-red-300 text-[10px] tracking-wider uppercase font-bold px-2.5 py-0.5 rounded-xs">
-            OUT OF STOCK
-          </span>
-        )}
       </div>
 
       {/* Product Title & Tagline */}
@@ -115,38 +95,18 @@ export function ProductInfo({ product }: ProductInfoProps) {
         </p>
       </div>
 
-      {/* Volume & Stock Status Spec */}
-      <div className="flex items-center justify-between gap-4 text-xs text-brand-charcoal py-2 border-y border-border-subtle">
-        <div className="flex items-center gap-4">
-          <div>
-            <span className="text-brand-mineral">Volume: </span>
-            <strong className="font-semibold">{product.volume}</strong>
-          </div>
-          {product.finish && (
-            <div>
-              <span className="text-brand-mineral">Finish: </span>
-              <strong className="font-semibold">{product.finish}</strong>
-            </div>
-          )}
-        </div>
-
-        {/* Global Stock Indicator */}
+      {/* Volume & Skin Type Spec */}
+      <div className="flex items-center gap-4 text-xs text-brand-charcoal py-2 border-y border-border-subtle">
         <div>
-          {isUpcoming ? (
-            <span className="text-xs text-brand-mineral font-medium uppercase tracking-wider">Coming Soon</span>
-          ) : isOutOfStock ? (
-            <span className="text-xs font-bold text-red-700 uppercase tracking-wider">OUT OF STOCK</span>
-          ) : availableStock <= 10 ? (
-            <span className="text-xs font-semibold text-amber-700">
-              Only {availableStock} {availableStock === 1 ? 'unit' : 'units'} available
-            </span>
-          ) : (
-            <span className="text-xs font-medium text-emerald-700 flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>{availableStock} units available</span>
-            </span>
-          )}
+          <span className="text-brand-mineral">Volume: </span>
+          <strong className="font-semibold">{product.volume}</strong>
         </div>
+        {product.finish && (
+          <div>
+            <span className="text-brand-mineral">Finish: </span>
+            <strong className="font-semibold">{product.finish}</strong>
+          </div>
+        )}
       </div>
 
       {/* Price Block */}
@@ -187,41 +147,7 @@ export function ProductInfo({ product }: ProductInfoProps) {
       )}
 
       {/* Quantity & CTA Buttons */}
-      {isUpcoming ? (
-        <div className="p-4 bg-surface-muted rounded-sm text-center space-y-2 border border-border-subtle">
-          <span className="text-xs uppercase tracking-widest text-brand-mineral font-semibold block">
-            Upcoming Formulation Launch
-          </span>
-          <p className="text-xs text-brand-mineral">
-            Sign up below to be notified first when batch inventory goes live.
-          </p>
-        </div>
-      ) : isOutOfStock ? (
-        <div className="space-y-3 pt-4 border-t border-border-subtle">
-          <div className="p-4 bg-red-50 border border-red-200 rounded-sm text-center space-y-1">
-            <span className="text-xs uppercase tracking-widest text-red-800 font-bold block">
-              Currently Out of Stock
-            </span>
-            <p className="text-xs text-red-700">
-              All batch units have been allocated. New cleanroom formulation is underway.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            <button
-              disabled
-              className="w-full bg-surface-muted text-brand-mineral/60 py-4 text-xs uppercase tracking-widest font-semibold cursor-not-allowed rounded-sm border border-border-subtle"
-            >
-              Out of Stock
-            </button>
-            <button
-              disabled
-              className="w-full bg-surface-muted text-brand-mineral/60 py-4 text-xs uppercase tracking-widest font-semibold cursor-not-allowed rounded-sm border border-border-subtle"
-            >
-              Unavailable
-            </button>
-          </div>
-        </div>
-      ) : (
+      {!product.isUpcoming && product.inStock ? (
         <div className="space-y-4 pt-4 border-t border-border-subtle">
           <div className="flex items-center gap-4">
             <span className="text-xs uppercase tracking-wider text-brand-charcoal font-semibold">
@@ -229,46 +155,48 @@ export function ProductInfo({ product }: ProductInfoProps) {
             </span>
             <div className="flex items-center border border-border-strong rounded-sm bg-surface-elevated">
               <button
-                onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
-                disabled={quantity <= 1}
-                className="p-2 text-brand-mineral hover:text-brand-charcoal disabled:opacity-30 disabled:cursor-not-allowed"
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                className="p-2 text-brand-mineral hover:text-brand-charcoal"
                 aria-label="Decrease quantity"
               >
                 <Minus className="w-3.5 h-3.5" />
               </button>
-              <span className="text-sm font-semibold px-4 text-brand-charcoal min-w-[2.5rem] text-center font-mono">
+              <span className="text-sm font-semibold px-4 text-brand-charcoal">
                 {quantity}
               </span>
               <button
-                onClick={() => setQuantity((prev) => Math.min(availableStock, prev + 1))}
-                disabled={quantity >= availableStock}
-                className="p-2 text-brand-mineral hover:text-brand-charcoal disabled:opacity-30 disabled:cursor-not-allowed"
+                onClick={() => setQuantity(quantity + 1)}
+                className="p-2 text-brand-mineral hover:text-brand-charcoal"
                 aria-label="Increase quantity"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
-            {quantity >= availableStock && (
-              <span className="text-[11px] text-amber-700 font-medium">Max available reached</span>
-            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
             <button
               onClick={handleAddToCart}
-              disabled={isAdding}
-              className="w-full bg-brand-charcoal text-white py-4 text-xs uppercase tracking-widest font-semibold hover:bg-brand-mineral transition-all rounded-sm shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full bg-brand-charcoal text-white py-4 text-xs uppercase tracking-widest font-semibold hover:bg-brand-mineral transition-all rounded-sm shadow-sm flex items-center justify-center gap-2"
             >
-              <span>{isAdding ? 'Adding...' : `Add to Bag • ${formatPrice(product.price * quantity)}`}</span>
+              <span>Add to Bag • {formatPrice(product.price * quantity)}</span>
             </button>
             <button
               onClick={handleBuyNow}
-              disabled={isAdding}
-              className="w-full bg-brand-amber text-brand-charcoal py-4 text-xs uppercase tracking-widest font-bold hover:bg-amber-400 transition-all rounded-sm shadow-sm disabled:opacity-50"
+              className="w-full bg-brand-amber text-brand-charcoal py-4 text-xs uppercase tracking-widest font-bold hover:bg-amber-400 transition-all rounded-sm shadow-sm"
             >
-              {isAdding ? 'Redirecting...' : 'Buy Now with 1-Click'}
+              Buy Now with 1-Click
             </button>
           </div>
+        </div>
+      ) : (
+        <div className="p-4 bg-surface-muted rounded-sm text-center space-y-2 border border-border-subtle">
+          <span className="text-xs uppercase tracking-widest text-brand-mineral font-semibold block">
+            Upcoming Formulation Launch
+          </span>
+          <p className="text-xs text-brand-mineral">
+            Sign up below to be notified first when batch inventory goes live.
+          </p>
         </div>
       )}
 

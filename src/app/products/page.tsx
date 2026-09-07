@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description: 'Explore the complete collection of VELYRA dermatologist-formulated photoprotection, barrier repair, and gentle cleansing rituals.',
 };
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 export default async function ProductsPage() {
   let products: Product[] = [];
