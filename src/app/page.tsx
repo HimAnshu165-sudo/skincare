@@ -15,7 +15,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { Product } from '@/types';
 
-export const revalidate = 60; // ISR revalidation
+export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   let products: Product[] = [];

@@ -30,8 +30,7 @@ function LoginForm() {
   // If already logged in, redirect
   React.useEffect(() => {
     if (user) {
-      const target = user.role === 'ADMIN' && (redirectUrl === '/account' || !redirectUrl) ? '/admin' : redirectUrl;
-      router.push(target);
+      router.push(redirectUrl);
     }
   }, [user, router, redirectUrl]);
 
@@ -66,10 +65,7 @@ function LoginForm() {
       if (result.success) {
         hideProcessing();
         setSubmitting(false);
-        const destination = (result as any).user?.role === 'ADMIN' && (redirectUrl === '/account' || !redirectUrl)
-          ? '/admin'
-          : redirectUrl;
-        router.push(destination);
+        router.push(redirectUrl);
       } else {
         hideProcessing();
         setSubmitting(false);

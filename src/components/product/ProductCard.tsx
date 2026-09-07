@@ -29,10 +29,13 @@ export function ProductCard({ product, featured = false }: ProductCardProps) {
 
   const discountPercent = calculateDiscount(product.mrp, product.price);
 
+  const isOutOfStock = !product.inStock || (product.stockQuantity ?? 0) <= 0;
+  const isUpcoming = Boolean(product.isUpcoming);
+
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (product.isUpcoming || !product.inStock) return;
+    if (isUpcoming || isOutOfStock) return;
 
     addItem(product, 1);
     setAddedAnimation(true);
@@ -62,12 +65,17 @@ export function ProductCard({ product, featured = false }: ProductCardProps) {
               New Launch
             </span>
           )}
-          {product.isUpcoming && (
+          {isUpcoming && (
             <span className="bg-brand-mineral text-white text-[10px] tracking-wider uppercase font-medium px-2 py-0.5 rounded-xs">
               Upcoming
             </span>
           )}
-          {discountPercent > 0 && !product.isUpcoming && (
+          {isOutOfStock && !isUpcoming && (
+            <span className="bg-red-800 text-white text-[10px] tracking-wider uppercase font-bold px-2 py-0.5 rounded-xs">
+              Out of Stock
+            </span>
+          )}
+          {discountPercent > 0 && !isUpcoming && !isOutOfStock && (
             <span className="bg-brand-olive text-white text-[10px] tracking-wider font-semibold px-2 py-0.5 rounded-xs">
               Save {discountPercent}%
             </span>
@@ -86,7 +94,7 @@ export function ProductCard({ product, featured = false }: ProductCardProps) {
         </div>
 
         {/* Quick Add Overlay on Hover (Desktop) */}
-        {!product.isUpcoming && product.inStock && (
+        {!isUpcoming && !isOutOfStock && (
           <div className="hidden sm:block absolute inset-x-3 bottom-3 z-10 translate-y-12 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
             <button
               onClick={handleQuickAdd}
@@ -142,9 +150,13 @@ export function ProductCard({ product, featured = false }: ProductCardProps) {
             )}
           </div>
 
-          {product.isUpcoming ? (
+          {isUpcoming ? (
             <span className="text-xs text-brand-mineral uppercase tracking-wider font-semibold">
               Coming Soon
+            </span>
+          ) : isOutOfStock ? (
+            <span className="text-xs text-red-700 uppercase tracking-wider font-semibold">
+              Out of Stock
             </span>
           ) : (
             <button

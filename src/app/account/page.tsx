@@ -84,15 +84,6 @@ export default function AccountDashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            {user.role === 'ADMIN' && (
-              <Link
-                href="/admin"
-                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-amber-600 text-white rounded-xs text-xs uppercase tracking-editorial font-medium hover:bg-amber-700 transition-colors shadow-xs"
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Admin Portal</span>
-              </Link>
-            )}
             <Link
               href="/products"
               className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-brand-charcoal text-white rounded-xs text-xs uppercase tracking-editorial font-medium hover:bg-black transition-colors"
