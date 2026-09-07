@@ -3,6 +3,7 @@ import { getAuthenticatedUser, requireAuthenticatedUser } from '@/lib/auth';
 import { getUserOrders, createOrder } from '@/lib/orders';
 import { prisma } from '@/lib/prisma';
 import { isValidEmail, isValidPhone, sanitizeString, validateCartQuantity, jsonError, jsonSuccess } from '@/lib/validation';
+import { checkRateLimit, checkDualRateLimit, getClientIp, rateLimitResponse } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,11 @@ export async function GET(request: Request) {
     const user = await getAuthenticatedUser(request);
     if (!user) {
       return jsonError('Unauthorized: Please sign in to view your orders.', 401);
+    }
+
+    const rateCheck = await checkRateLimit(`orders:list:${user.id}`, 60, 60000);
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.resetSeconds, 'Too many order history requests. Please try again later.');
     }
 
     const orders = await getUserOrders(user.id);
@@ -44,6 +50,20 @@ export async function POST(request: Request) {
     if (auth.status !== 200 || !auth.user) {
       return jsonError(auth.error || 'Authentication required to place an order.', auth.status);
     }
+    const user = auth.user;
+
+    const ip = getClientIp(request);
+    const rateCheck = await checkDualRateLimit(
+      `orders:create:user:${user.id}`,
+      10,
+      60000,
+      `orders:create:ip:${ip}`,
+      10,
+      60000
+    );
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.resetSeconds, 'Too many order requests. Please try again later.');
+    }
 
     let body: any;
     try {
@@ -63,7 +83,6 @@ export async function POST(request: Request) {
       notes,
     } = body || {};
 
-    const user = auth.user;
     const sanitizedName = sanitizeString(customerName || user.name, 100);
     const sanitizedEmail = typeof customerEmail === 'string' ? customerEmail.trim().toLowerCase() : user.email;
     const sanitizedPhone = sanitizeString(customerPhone || user.phone || '', 20);

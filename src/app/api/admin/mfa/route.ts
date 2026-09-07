@@ -2,22 +2,30 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminUser, hashPassword, verifyPassword } from '@/lib/auth';
 import { logAdminAction } from '@/lib/audit';
-import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { checkRateLimit, checkDualRateLimit, getClientIp, rateLimitResponse } from '@/lib/rateLimit';
 import { jsonError, jsonSuccess } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const ip = getClientIp(request);
-    const rateCheck = checkRateLimit(`admin-mfa:${ip}`, 5, 60000);
-    if (!rateCheck.allowed) {
-      return jsonError(`Too many attempts. Please try again in ${rateCheck.resetSeconds}s.`, 429);
-    }
-
     const auth = await requireAdminUser(request);
     if (auth.status !== 200 || !auth.user) {
       return jsonError(auth.error || 'Unauthorized', auth.status);
+    }
+
+    const ip = getClientIp(request);
+    const rateCheck = await checkDualRateLimit(
+      `admin-mfa:ip:${ip}`,
+      5,
+      60000,
+      `admin-mfa:user:${auth.user.id}`,
+      5,
+      60000
+    );
+
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.resetSeconds, 'Too many attempts. Please try again later.');
     }
 
     let body: any;

@@ -31,10 +31,14 @@ export interface MediaListItem {
 }
 
 /**
- * Validates whether the Vercel Blob upload token is available.
+ * Validates whether Vercel Blob credentials (Token or OIDC) may be available.
  */
 export function isBlobConfigured(): boolean {
-  return !!process.env.BLOB_READ_WRITE_TOKEN;
+  return !!(
+    process.env.BLOB_READ_WRITE_TOKEN ||
+    process.env.VERCEL_OIDC_TOKEN ||
+    process.env.VERCEL
+  );
 }
 
 /**
@@ -152,11 +156,15 @@ export async function listBlobMedia(folder?: string, productId?: string) {
     };
   }
 
-  // 2. Fetch live blobs from Vercel Blob store
+  // 2. Fetch live blobs from Vercel Blob store with 2.5s timeout protection
   try {
-    const blobList = await list({
+    const listPromise = list({
       prefix: folder ? (folder.endsWith('/') ? folder : `${folder}/`) : undefined,
     });
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Vercel Blob list() timed out after 2500ms')), 2500)
+    );
+    const blobList = await Promise.race([listPromise, timeoutPromise]);
 
     const dbMapByPath = new Map<string, typeof dbImages[0]>();
     const dbMapByUrl = new Map<string, typeof dbImages[0]>();

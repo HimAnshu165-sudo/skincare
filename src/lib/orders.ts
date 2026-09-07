@@ -232,14 +232,25 @@ export async function createOrder(params: CreateOrderParams) {
 }
 
 /**
- * Fetch orders for authenticated customer.
+ * Fetch orders for authenticated customer with strict user scoping and payment secret protection.
  */
 export async function getUserOrders(userId: string) {
+  if (!userId) return [];
   return prisma.order.findMany({
     where: { userId },
     include: {
       items: true,
-      payments: true,
+      payments: {
+        select: {
+          id: true,
+          amount: true,
+          currency: true,
+          method: true,
+          status: true,
+          razorpayPaymentId: true,
+          createdAt: true,
+        },
+      },
       statusHistory: { orderBy: { createdAt: 'desc' } },
     },
     orderBy: { createdAt: 'desc' },
@@ -248,40 +259,63 @@ export async function getUserOrders(userId: string) {
 
 /**
  * Fetch a single order for authenticated user with strict IDOR verification.
+ * Guarantees that order.userId === session.userId. Never returns another user's order.
  */
 export async function getUserOrderById(orderId: string, userId: string) {
-  const order = await prisma.order.findFirst({
+  if (!orderId || !userId) return null;
+  const trimmed = orderId.trim();
+
+  return prisma.order.findFirst({
     where: {
+      userId,
       OR: [
-        { id: orderId, userId },
-        { orderNumber: orderId, userId },
+        { id: trimmed },
+        { orderNumber: trimmed },
       ],
     },
     include: {
       items: true,
-      payments: true,
+      payments: {
+        select: {
+          id: true,
+          amount: true,
+          currency: true,
+          method: true,
+          status: true,
+          razorpayPaymentId: true,
+          createdAt: true,
+        },
+      },
       statusHistory: { orderBy: { createdAt: 'asc' } },
     },
   });
-
-  return order;
 }
 
 /**
- * Fetch order for public tracking by Order Number or Phone (Guest or Auth).
+ * Fetch order by ID or order number for authorized administrative operations.
  */
-export async function getOrderForTracking(query: string) {
-  const trimmed = query.trim();
+export async function getAdminOrderById(orderId: string) {
+  const trimmed = orderId.trim();
   return prisma.order.findFirst({
     where: {
       OR: [
-        { orderNumber: { equals: trimmed } },
-        { id: { equals: trimmed } },
-        { customerPhone: { equals: trimmed } },
+        { id: trimmed },
+        { orderNumber: trimmed },
       ],
     },
     include: {
       items: true,
+      payments: {
+        select: {
+          id: true,
+          amount: true,
+          currency: true,
+          method: true,
+          status: true,
+          razorpayPaymentId: true,
+          createdAt: true,
+        },
+      },
       statusHistory: { orderBy: { createdAt: 'asc' } },
     },
   });

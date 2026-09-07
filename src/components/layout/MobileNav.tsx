@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { X, ArrowRight, ShieldCheck, User as UserIcon, Package, MapPin, LogOut } from 'lucide-react';
+import { X, ArrowRight, ShieldCheck, User as UserIcon, Package, MapPin, LogOut, Shield } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 interface MobileNavProps {
@@ -19,21 +19,22 @@ export function MobileNav({ isOpen, onClose, links }: MobileNavProps) {
     <div className="fixed inset-0 z-50 lg:hidden">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-brand-charcoal/40 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-brand-charcoal/40 backdrop-blur-xs transition-opacity"
         onClick={onClose}
       />
 
       {/* Slide Drawer */}
-      <div className="fixed inset-y-0 left-0 max-w-xs w-full bg-surface-base shadow-2xl flex flex-col justify-between p-6 z-10 animate-fade-in border-r border-border-subtle overflow-y-auto">
+      <div className="fixed inset-y-0 left-0 max-w-xs w-full bg-surface-elevated shadow-xl z-50 p-6 flex flex-col justify-between overflow-y-auto animate-fade-in border-r border-border-subtle">
         <div>
           {/* Header */}
           <div className="flex items-center justify-between pb-6 border-b border-border-subtle">
-            <span className="font-serif text-2xl tracking-[0.2em] font-medium text-brand-charcoal uppercase">
+            <span className="font-serif text-xl tracking-[0.15em] font-medium text-brand-charcoal uppercase">
               VELYRA
             </span>
             <button
+              type="button"
               onClick={onClose}
-              className="p-1.5 text-brand-charcoal/60 hover:text-brand-charcoal transition-colors"
+              className="p-1.5 text-brand-charcoal hover:opacity-70 transition-opacity"
               aria-label="Close menu"
             >
               <X className="w-5 h-5" />
@@ -41,11 +42,11 @@ export function MobileNav({ isOpen, onClose, links }: MobileNavProps) {
           </div>
 
           {/* User Status Strip */}
-          <div className="mt-4 p-3 bg-surface-elevated border border-border-subtle rounded-xs">
+          <div className="py-4 border-b border-border-subtle">
             {user ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-full bg-brand-sand/60 text-brand-charcoal text-xs font-semibold flex items-center justify-center border border-brand-sand">
+                  <div className="w-8 h-8 rounded-full bg-brand-sand/60 text-brand-charcoal text-xs font-semibold flex items-center justify-center border border-brand-sand">
                     {user.name ? user.name[0].toUpperCase() : 'U'}
                   </div>
                   <div className="truncate">
@@ -53,6 +54,20 @@ export function MobileNav({ isOpen, onClose, links }: MobileNavProps) {
                     <p className="text-[10px] text-foreground/50 truncate">{user.email}</p>
                   </div>
                 </div>
+
+                {user.role === 'ADMIN' && (
+                  <div className="pt-1">
+                    <Link
+                      href="/admin"
+                      onClick={onClose}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xs bg-amber-500/10 text-amber-800 border border-amber-500/20 text-xs font-medium"
+                    >
+                      <Shield className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Admin Operations Dashboard</span>
+                    </Link>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-2 pt-1 border-t border-border-subtle text-[11px]">
                   <Link
                     href="/account/orders"

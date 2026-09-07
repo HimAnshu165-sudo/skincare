@@ -1,14 +1,20 @@
 'use client';
 
 import React, { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { MessageCircle, X } from 'lucide-react';
 
 export function WhatsAppButton() {
+  const pathname = usePathname();
   const [showTooltip, setShowTooltip] = useState(false);
   const phoneNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '919876543210';
   const defaultMessage = encodeURIComponent(
     process.env.NEXT_PUBLIC_WHATSAPP_MESSAGE || 'Hello VELYRA, I would like skincare consultation.'
   );
+
+  if (pathname.startsWith('/admin')) {
+    return null;
+  }
 
   return (
     <div className="fixed bottom-6 right-6 z-40 flex items-end flex-col gap-2">

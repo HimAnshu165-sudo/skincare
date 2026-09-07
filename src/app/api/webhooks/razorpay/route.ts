@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
-import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
-    const rateCheck = checkRateLimit(`webhook-razorpay:${ip}`, 120, 60000);
+    const rateCheck = await checkRateLimit(`webhook-razorpay:${ip}`, 120, 60000);
     if (!rateCheck.allowed) {
-      return NextResponse.json({ success: false, message: 'Rate limit exceeded.' }, { status: 429 });
+      return rateLimitResponse(rateCheck.resetSeconds, 'Webhook rate limit exceeded.');
     }
 
     const rawBody = await request.text();

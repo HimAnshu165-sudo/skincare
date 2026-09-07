@@ -107,3 +107,30 @@ export function jsonSuccess<T extends object>(data: T, status = 200) {
     { status }
   );
 }
+
+/**
+ * Validates and sanitizes redirect/next parameters to prevent Open Redirect vulnerabilities.
+ * Only allows relative internal paths starting with a single '/' (e.g. '/admin', '/account').
+ * Rejects protocol-relative URLs (e.g. '//evil.com'), absolute URLs ('https://evil.com'),
+ * javascript: URIs, data: URIs, or backslash tricks ('/\\evil.com').
+ */
+export function sanitizeRedirectPath(
+  url: string | null | undefined,
+  defaultPath: string = '/'
+): string {
+  if (!url || typeof url !== 'string') return defaultPath;
+  const trimmed = url.trim();
+
+  // Must start with '/' but NOT '//' or '/\'
+  if (!trimmed.startsWith('/') || trimmed.startsWith('//') || trimmed.startsWith('/\\')) {
+    return defaultPath;
+  }
+
+  // Reject URL scheme indicators or backslashes
+  if (trimmed.includes(':') || trimmed.includes('\\')) {
+    return defaultPath;
+  }
+
+  return trimmed;
+}
+

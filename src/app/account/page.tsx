@@ -101,6 +101,28 @@ export default function AccountDashboardPage() {
           </div>
         </div>
 
+        {/* Administrator Portal Quick-Link */}
+        {user.role === 'ADMIN' && (
+          <div className="bg-amber-500/10 border border-amber-500/30 p-4 sm:p-5 rounded-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-amber-500/20 text-amber-700 flex items-center justify-center">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-amber-900">Administrator Privileges Active</h2>
+                <p className="text-xs text-amber-800/80">Your session is authenticated for store operations and management.</p>
+              </div>
+            </div>
+            <Link
+              href="/admin"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xs text-xs uppercase tracking-wider font-semibold transition-colors"
+            >
+              <span>Go to Admin Dashboard</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        )}
+
         {/* Quick Navigation Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           <Link

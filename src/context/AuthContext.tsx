@@ -15,7 +15,7 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
+  login: (email: string, password: string, pin?: string) => Promise<{ success: boolean; requiresMfa?: boolean; user?: User; message?: string }>;
   signup: (name: string, email: string, password: string, phone?: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -49,22 +49,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshUser();
   }, [refreshUser]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, pin?: string) => {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, pin }),
       });
 
       const data = await res.json();
       if (data.success) {
+        if (data.requiresMfa) {
+          return { success: true, requiresMfa: true, user: data.user, message: data.message };
+        }
         setUser(data.user);
         // Trigger cart sync
         window.dispatchEvent(new CustomEvent('auth:login'));
-        return { success: true };
+        return { success: true, requiresMfa: false, user: data.user, message: data.message };
       }
-      return { success: false, message: data.message || 'Login failed.' };
+      return { success: false, message: data.message || data.error || 'Login failed.' };
     } catch (err: any) {
       return { success: false, message: err.message || 'Network error during login.' };
     }
