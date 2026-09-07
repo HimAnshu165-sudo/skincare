@@ -59,10 +59,14 @@ export function verifyRazorpaySignature(
       .update(`${razorpayOrderId}|${razorpayPaymentId}`)
       .digest('hex');
 
-    return crypto.timingSafeEqual(
-      Buffer.from(generatedSignature),
-      Buffer.from(razorpaySignature)
-    );
+    const generatedBuffer = Buffer.from(generatedSignature);
+    const signatureBuffer = Buffer.from(razorpaySignature);
+
+    if (generatedBuffer.length !== signatureBuffer.length) {
+      return false;
+    }
+
+    return crypto.timingSafeEqual(generatedBuffer, signatureBuffer);
   } catch (error) {
     console.error('Error verifying signature:', error);
     return false;

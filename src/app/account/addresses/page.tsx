@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useProcessing } from '@/context/ProcessingContext';
 import {
   MapPin,
   Plus,
@@ -33,6 +34,7 @@ interface Address {
 
 export default function AccountAddressesPage() {
   const { user, loading } = useAuth();
+  const { showProcessing, hideProcessing } = useProcessing();
   const router = useRouter();
 
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -113,12 +115,20 @@ export default function AccountAddressesPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
     setError('');
+
+    const cleanedPhone = phone.trim().replace(/\D/g, '');
+    if (!/^[6-9]\d{9}$/.test(cleanedPhone)) {
+      setError('Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.');
+      return;
+    }
+
+    setSaving(true);
+    showProcessing('Saving delivery address...', 'Updating your address book in database...');
 
     const payload = {
       fullName,
-      phone,
+      phone: cleanedPhone,
       addressLine1,
       addressLine2,
       city,
@@ -148,6 +158,7 @@ export default function AccountAddressesPage() {
     } catch {
       setError('Network error saving address.');
     } finally {
+      hideProcessing();
       setSaving(false);
     }
   };

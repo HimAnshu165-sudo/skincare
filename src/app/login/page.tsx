@@ -4,6 +4,7 @@ import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useProcessing } from '@/context/ProcessingContext';
 import { ArrowRight, Lock, Mail, Sparkles, AlertCircle, Loader2, Eye, EyeOff } from 'lucide-react';
 
 function LoginForm() {
@@ -11,12 +12,20 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect') || '/account';
   const { login, user } = useAuth();
+  const { showProcessing, hideProcessing } = useProcessing();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Clean up global processing overlay on component unmount
+  React.useEffect(() => {
+    return () => {
+      hideProcessing();
+    };
+  }, [hideProcessing]);
 
   // If already logged in, redirect
   React.useEffect(() => {
@@ -49,13 +58,26 @@ function LoginForm() {
     }
 
     setSubmitting(true);
-    const result = await login(trimmedEmail, password);
-    setSubmitting(false);
+    showProcessing('Signing you in...', 'Authenticating credentials and synchronizing your cart...');
 
-    if (result.success) {
-      router.push(redirectUrl);
-    } else {
-      setError(result.message || 'Invalid credentials. Please try again.');
+    try {
+      const result = await login(trimmedEmail, password);
+      if (result.success) {
+        hideProcessing();
+        setSubmitting(false);
+        router.push(redirectUrl);
+      } else {
+        hideProcessing();
+        setSubmitting(false);
+        setError(result.message || 'Invalid credentials. Please try again.');
+      }
+    } catch {
+      hideProcessing();
+      setSubmitting(false);
+      setError('A network error occurred. Please try again.');
+    } finally {
+      // Guaranteed safety cleanup in case of unhandled transitions
+      hideProcessing();
     }
   };
 

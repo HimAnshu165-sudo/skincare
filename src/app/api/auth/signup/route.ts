@@ -42,13 +42,14 @@ export async function POST(request: Request) {
     }
 
     if (sanitizedPhone && !isValidPhone(sanitizedPhone)) {
-      return jsonError('Please enter a valid 10-digit mobile number.', 400);
+      return jsonError('Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.', 400);
     }
     const finalPhone = sanitizedPhone ? normalizePhone(sanitizedPhone) : null;
 
     // Check existing email pre-flight
     const existing = await prisma.user.findUnique({
       where: { email: sanitizedEmail },
+      select: { id: true },
     });
 
     if (existing) {

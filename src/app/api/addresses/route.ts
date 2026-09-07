@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     }
 
     if (!isValidPhone(sanitizedPhone)) {
-      return jsonError('Please enter a valid phone number.', 400);
+      return jsonError('Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.', 400);
     }
 
     if (!sanitizedAddressLine1 || !sanitizedCity || !sanitizedState) {

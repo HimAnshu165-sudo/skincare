@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, Lock, ArrowRight, CheckCircle2, MapPin, Plus, Loader2, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Lock, ArrowRight, CheckCircle2, MapPin, Plus, Loader2, AlertCircle, LogIn } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
+import { useProcessing } from '@/context/ProcessingContext';
 import { PaymentMethodSelector } from './PaymentMethodSelector';
 import { trackBeginCheckout, trackPurchase } from '@/lib/analytics';
 import confetti from 'canvas-confetti';
@@ -33,6 +35,7 @@ export function CheckoutForm() {
   const router = useRouter();
   const { items, subtotal, discount, shippingFee, total, appliedCoupon, clearCart } = useCart();
   const { user } = useAuth();
+  const { showProcessing, hideProcessing } = useProcessing();
 
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | 'NEW'>('NEW');
@@ -52,6 +55,13 @@ export function CheckoutForm() {
   const [paymentMethod, setPaymentMethod] = useState<'ONLINE' | 'COD'>('ONLINE');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Clean up global processing overlay on component unmount
+  useEffect(() => {
+    return () => {
+      hideProcessing();
+    };
+  }, [hideProcessing]);
 
   const indianStates = [
     'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
@@ -152,8 +162,9 @@ export function CheckoutForm() {
       return;
     }
 
-    if (!/^\d{10}$/.test(formData.phone.trim().replace(/\D/g, '').slice(-10))) {
-      setErrorMsg('Please enter a valid 10-digit Indian mobile number.');
+    const digitsOnly = formData.phone.trim().replace(/\D/g, '').slice(-10);
+    if (!/^[6-9]\d{9}$/.test(digitsOnly)) {
+      setErrorMsg('Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.');
       return;
     }
 
@@ -164,6 +175,12 @@ export function CheckoutForm() {
 
     if (!items || items.length === 0) {
       setErrorMsg('Your cart is empty. Please add formulations before checkout.');
+      return;
+    }
+
+    // Require authentication to place order
+    if (!user) {
+      router.push(`/login?redirect=${encodeURIComponent('/checkout')}`);
       return;
     }
 
@@ -183,6 +200,11 @@ export function CheckoutForm() {
 
     try {
       if (paymentMethod === 'COD') {
+        showProcessing(
+          'Confirming your order...',
+          'Securing formulation batches and scheduling express dispatch. Please do not close this window.'
+        );
+
         // Cash on Delivery Transaction
         const res = await fetch('/api/checkout', {
           method: 'POST',
@@ -204,6 +226,7 @@ export function CheckoutForm() {
 
         const data = await res.json();
         if (!res.ok || !data.success) {
+          hideProcessing();
           throw new Error(data.message || 'Failed to place COD order.');
         }
 
@@ -216,9 +239,15 @@ export function CheckoutForm() {
         } catch {}
 
         await clearCart();
+        showProcessing('Order confirmed!', 'Redirecting to your order confirmation receipt...');
         router.push(`/order-success?orderId=${data.order.id}&orderNumber=${data.order.orderNumber}`);
       } else {
         // Online Payment Flow via Razorpay
+        showProcessing(
+          'Connecting to payment gateway...',
+          'Opening 256-bit encrypted Razorpay interface...'
+        );
+
         const orderRes = await fetch('/api/razorpay/create-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -237,11 +266,17 @@ export function CheckoutForm() {
 
         const orderData = await orderRes.json();
         if (!orderRes.ok || !orderData.success) {
+          hideProcessing();
           throw new Error(orderData.message || 'Error initializing payment gateway.');
         }
 
         // Test simulation / fallback if Razorpay script is not loaded
         if (orderData.isSimulation || !window.Razorpay) {
+          showProcessing(
+            'Verifying test payment signature...',
+            'Validating test transaction with bank simulator...'
+          );
+
           const verifyRes = await fetch('/api/razorpay/verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -255,9 +290,13 @@ export function CheckoutForm() {
 
           await verifyRes.json();
           await clearCart();
+          showProcessing('Payment verified!', 'Redirecting to your order receipt...');
           router.push(`/order-success?orderId=${orderData.order.id}&orderNumber=${orderData.order.orderNumber}`);
           return;
         }
+
+        // Hide overlay while Razorpay modal is open for user interaction
+        hideProcessing();
 
         // Live Razorpay SDK Modal
         const options = {
@@ -269,6 +308,10 @@ export function CheckoutForm() {
           image: '/brand/logo-icon.svg',
           order_id: orderData.razorpayOrder.id,
           handler: async function (response: any) {
+            showProcessing(
+              'Verifying payment signature...',
+              'Confirming transaction with bank network. Please do not close this window.'
+            );
             try {
               const verifyRes = await fetch('/api/razorpay/verify', {
                 method: 'POST',
@@ -284,11 +327,16 @@ export function CheckoutForm() {
               const verifyData = await verifyRes.json();
               if (verifyData.success) {
                 await clearCart();
+                showProcessing('Payment verified!', 'Redirecting to your order receipt...');
                 router.push(`/order-success?orderId=${orderData.order.id}&orderNumber=${orderData.order.orderNumber}`);
               } else {
+                hideProcessing();
+                setLoading(false);
                 setErrorMsg('Payment verification failed. Please contact concierge support.');
               }
             } catch {
+              hideProcessing();
+              setLoading(false);
               setErrorMsg('Error verifying payment signature.');
             }
           },
@@ -304,12 +352,14 @@ export function CheckoutForm() {
 
         const rzp = new window.Razorpay(options);
         rzp.on('payment.failed', function (resp: any) {
+          hideProcessing();
           setErrorMsg(resp.error?.description || 'Payment was declined. Please retry or choose Cash on Delivery.');
           setLoading(false);
         });
         rzp.open();
       }
     } catch (err: any) {
+      hideProcessing();
       console.error('Checkout error:', err);
       setErrorMsg(err.message || 'An error occurred during checkout.');
       setLoading(false);
@@ -342,9 +392,13 @@ export function CheckoutForm() {
               Signed in as {user.email}
             </span>
           ) : (
-            <span className="text-[11px] text-foreground/50">
-              Guest Checkout
-            </span>
+            <Link
+              href={`/login?redirect=${encodeURIComponent('/checkout')}`}
+              className="inline-flex items-center gap-1 text-[11px] text-brand-charcoal font-semibold underline uppercase tracking-wider hover:text-brand-mineral"
+            >
+              <LogIn className="w-3 h-3" />
+              <span>Sign in to continue</span>
+            </Link>
           )}
         </div>
 
@@ -591,6 +645,11 @@ export function CheckoutForm() {
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
               <span>Authorizing & Verifying Order...</span>
+            </>
+          ) : !user ? (
+            <>
+              <span>Sign In to Place Order</span>
+              <ArrowRight className="w-4 h-4" />
             </>
           ) : (
             <>

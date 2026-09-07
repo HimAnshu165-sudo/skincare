@@ -28,6 +28,9 @@ interface AuthUser {
   role: string;
 }
 
+import { useAuth } from '@/context/AuthContext';
+import { useProcessing } from '@/context/ProcessingContext';
+
 export default function AdminLayout({
   children,
 }: {
@@ -35,43 +38,16 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [unauthorized, setUnauthorized] = useState(false);
+  const { user, loading: authLoading, logout } = useAuth();
+  const { showProcessing } = useProcessing();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  useEffect(() => {
-    async function checkAuth() {
-      try {
-        const res = await fetch('/api/auth/me');
-        const data = await res.json();
-        if (data.success && data.user) {
-          if (data.user.role === 'ADMIN') {
-            setUser(data.user);
-            setUnauthorized(false);
-          } else {
-            setUnauthorized(true);
-          }
-        } else {
-          setUnauthorized(true);
-        }
-      } catch (err) {
-        console.error('Auth verification error:', err);
-        setUnauthorized(true);
-      } finally {
-        setLoading(false);
-      }
-    }
-    checkAuth();
-  }, []);
+  const unauthorized = !authLoading && (!user || user.role !== 'ADMIN');
+  const loading = authLoading;
 
   const handleLogout = async () => {
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      router.push('/account/login');
-    } catch (err) {
-      console.error('Logout error:', err);
-    }
+    showProcessing('Signing out...', 'Closing secure administrative session...');
+    await logout();
   };
 
   const navItems = [

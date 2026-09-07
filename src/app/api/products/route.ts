@@ -19,8 +19,29 @@ export async function GET(request: Request) {
 
     const products = await prisma.product.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        tagline: true,
+        price: true,
+        mrp: true,
+        inStock: true,
+        stockQuantity: true,
+        sku: true,
+        volume: true,
+        spfRating: true,
+        finish: true,
+        skinType: true,
+        images: true,
+        benefits: true,
+        keyIngredients: true,
+        isFeatured: true,
+        isUpcoming: true,
+        category: true,
+        createdAt: true,
         productImages: {
+          select: { url: true, alt: true, isPrimary: true, sortOrder: true },
           orderBy: { sortOrder: 'asc' },
         },
       },

@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
+import { ProcessingProvider } from "@/context/ProcessingContext";
+import { ProcessingOverlay } from "@/components/ui/ProcessingOverlay";
 import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
@@ -116,18 +118,21 @@ export default function RootLayout({
         )}
       </head>
       <body className="min-h-screen flex flex-col font-sans bg-surface-base text-brand-charcoal antialiased selection:bg-brand-sand selection:text-brand-charcoal" suppressHydrationWarning>
-        <AuthProvider>
-          <CartProvider>
-            <AnnouncementBar />
-            <Navbar />
-            <main className="flex-1">
-              {children}
-            </main>
-            <Footer />
-            <WhatsAppButton />
-            <CartDrawer />
-          </CartProvider>
-        </AuthProvider>
+        <ProcessingProvider>
+          <AuthProvider>
+            <CartProvider>
+              <AnnouncementBar />
+              <Navbar />
+              <main className="flex-1">
+                {children}
+              </main>
+              <Footer />
+              <WhatsAppButton />
+              <CartDrawer />
+              <ProcessingOverlay />
+            </CartProvider>
+          </AuthProvider>
+        </ProcessingProvider>
       </body>
     </html>
   );

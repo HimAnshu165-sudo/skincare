@@ -52,13 +52,19 @@ export async function createOrder(params: CreateOrderParams) {
     let calculatedSubtotal = 0;
     const validatedItems = [];
 
-    for (const item of items) {
-      if (item.quantity <= 0) continue;
+    const validItems = items.filter((i) => i.quantity > 0);
+    const productIds = validItems.map((i) => i.productId);
 
-      const product = await tx.product.findUnique({
-        where: { id: item.productId },
-        include: { productImages: { orderBy: { sortOrder: 'asc' } } },
-      });
+    // Batch fetch all ordered products in 1 query
+    const products = await tx.product.findMany({
+      where: { id: { in: productIds } },
+      include: { productImages: { orderBy: { sortOrder: 'asc' } } },
+    });
+
+    const productMap = new Map(products.map((p) => [p.id, p]));
+
+    for (const item of validItems) {
+      const product = productMap.get(item.productId);
 
       if (!product || !product.inStock || product.isUpcoming) {
         throw new Error(`Product "${product?.name || 'Selected item'}" is currently unavailable.`);
@@ -68,14 +74,23 @@ export async function createOrder(params: CreateOrderParams) {
         throw new Error(`Insufficient stock for "${product.name}". Only ${product.stockQuantity} remaining.`);
       }
 
-      // Decrement inventory atomically
-      await tx.product.update({
-        where: { id: product.id },
+      const newStock = product.stockQuantity - item.quantity;
+
+      // Concurrency-safe atomic inventory decrement: ensures stock never becomes negative
+      const updateResult = await tx.product.updateMany({
+        where: {
+          id: product.id,
+          stockQuantity: { gte: item.quantity },
+        },
         data: {
           stockQuantity: { decrement: item.quantity },
-          inStock: product.stockQuantity - item.quantity > 0,
+          inStock: newStock > 0,
         },
       });
+
+      if (updateResult.count === 0) {
+        throw new Error(`Insufficient stock for "${product.name}". The requested quantity is no longer available.`);
+      }
 
       // Resolve primary image for snapshot
       let imgUrl = '/products/sunscreen-hero.webp';

@@ -100,6 +100,22 @@ export function formatCart(cart: any): FormattedCart {
   };
 }
 
+const CART_PRODUCT_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  price: true,
+  mrp: true,
+  volume: true,
+  inStock: true,
+  stockQuantity: true,
+  images: true,
+  productImages: {
+    select: { url: true, alt: true, isPrimary: true, sortOrder: true },
+    orderBy: { sortOrder: 'asc' as const },
+  },
+};
+
 /**
  * Get or create Cart in PostgreSQL for an authenticated user or guest token.
  */
@@ -110,9 +126,7 @@ export async function getOrCreateCart(userId?: string | null, guestToken?: strin
       include: {
         items: {
           include: {
-            product: {
-              include: { productImages: { orderBy: { sortOrder: 'asc' } } },
-            },
+            product: { select: CART_PRODUCT_SELECT },
           },
           orderBy: { createdAt: 'asc' },
         },
@@ -125,9 +139,7 @@ export async function getOrCreateCart(userId?: string | null, guestToken?: strin
         include: {
           items: {
             include: {
-              product: {
-                include: { productImages: { orderBy: { sortOrder: 'asc' } } },
-              },
+              product: { select: CART_PRODUCT_SELECT },
             },
           },
         },
@@ -143,9 +155,7 @@ export async function getOrCreateCart(userId?: string | null, guestToken?: strin
       include: {
         items: {
           include: {
-            product: {
-              include: { productImages: { orderBy: { sortOrder: 'asc' } } },
-            },
+            product: { select: CART_PRODUCT_SELECT },
           },
           orderBy: { createdAt: 'asc' },
         },
@@ -158,9 +168,7 @@ export async function getOrCreateCart(userId?: string | null, guestToken?: strin
         include: {
           items: {
             include: {
-              product: {
-                include: { productImages: { orderBy: { sortOrder: 'asc' } } },
-              },
+              product: { select: CART_PRODUCT_SELECT },
             },
           },
         },
@@ -183,6 +191,7 @@ export async function addItemToCart(cartId: string, productId: string, quantity 
 
   const product = await prisma.product.findUnique({
     where: { id: productId },
+    select: { id: true, stockQuantity: true, inStock: true, isUpcoming: true },
   });
 
   if (!product || !product.inStock || product.isUpcoming) {
@@ -229,7 +238,7 @@ export async function updateCartItemQuantity(cartId: string, cartItemId: string,
 
   const item = await prisma.cartItem.findFirst({
     where: { id: cartItemId, cartId },
-    include: { product: true },
+    include: { product: { select: { stockQuantity: true } } },
   });
 
   if (!item) {
@@ -279,9 +288,7 @@ export async function getCartById(cartId: string) {
     include: {
       items: {
         include: {
-          product: {
-            include: { productImages: { orderBy: { sortOrder: 'asc' } } },
-          },
+          product: { select: CART_PRODUCT_SELECT },
         },
         orderBy: { createdAt: 'asc' },
       },
@@ -293,6 +300,7 @@ export async function getCartById(cartId: string) {
 
 /**
  * Merge guest cart into authenticated customer cart upon login/signup transactionally.
+ * Batched to execute with minimum network round trips.
  */
 export async function mergeGuestCartIntoUserCart(guestToken: string, userId: string) {
   if (!guestToken || !userId) return;
@@ -321,46 +329,65 @@ export async function mergeGuestCartIntoUserCart(guestToken: string, userId: str
       });
     }
 
-    for (const guestItem of guestCart.items) {
-      const product = await tx.product.findUnique({
-        where: { id: guestItem.productId },
-      });
+    const productIds = guestCart.items.map((i) => i.productId);
 
+    // Batch fetch all products and existing user cart items in 2 parallel queries
+    const [products, existingUserItems] = await Promise.all([
+      tx.product.findMany({
+        where: { id: { in: productIds } },
+        select: { id: true, stockQuantity: true, inStock: true },
+      }),
+      tx.cartItem.findMany({
+        where: {
+          cartId: userCart.id,
+          productId: { in: productIds },
+        },
+      }),
+    ]);
+
+    const productMap = new Map(products.map((p) => [p.id, p]));
+    const userItemMap = new Map(existingUserItems.map((ui) => [ui.productId, ui]));
+
+    const itemOperations: Promise<any>[] = [];
+
+    for (const guestItem of guestCart.items) {
+      const product = productMap.get(guestItem.productId);
       if (!product || !product.inStock) continue;
 
-      const userItem = await tx.cartItem.findUnique({
-        where: {
-          cartId_productId: {
-            cartId: userCart.id,
-            productId: guestItem.productId,
-          },
-        },
-      });
+      const userItem = userItemMap.get(guestItem.productId);
 
       if (userItem) {
         const mergedQty = Math.min(
           userItem.quantity + guestItem.quantity,
           product.stockQuantity
         );
-        await tx.cartItem.update({
-          where: { id: userItem.id },
-          data: { quantity: mergedQty },
-        });
+        itemOperations.push(
+          tx.cartItem.update({
+            where: { id: userItem.id },
+            data: { quantity: mergedQty },
+          })
+        );
       } else {
         const initialQty = Math.min(guestItem.quantity, product.stockQuantity);
         if (initialQty > 0) {
-          await tx.cartItem.create({
-            data: {
-              cartId: userCart.id,
-              productId: guestItem.productId,
-              quantity: initialQty,
-            },
-          });
+          itemOperations.push(
+            tx.cartItem.create({
+              data: {
+                cartId: userCart.id,
+                productId: guestItem.productId,
+                quantity: initialQty,
+              },
+            })
+          );
         }
       }
     }
 
-    // Delete the guest cart and its items after merge
+    if (itemOperations.length > 0) {
+      await Promise.all(itemOperations);
+    }
+
+    // Delete the guest cart items and guest cart in parallel
     await tx.cartItem.deleteMany({ where: { cartId: guestCart.id } });
     await tx.cart.delete({ where: { id: guestCart.id } });
   });

@@ -24,6 +24,7 @@ export default function AccountDashboardPage() {
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
   const [addressCount, setAddressCount] = useState(0);
   const [ordersLoading, setOrdersLoading] = useState(true);
+  const [addressesLoading, setAddressesLoading] = useState(true);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -33,7 +34,7 @@ export default function AccountDashboardPage() {
 
   useEffect(() => {
     if (user) {
-      // Fetch orders
+      // Fetch orders independently
       fetch('/api/orders')
         .then((res) => res.json())
         .then((data) => {
@@ -44,7 +45,7 @@ export default function AccountDashboardPage() {
         .catch(console.error)
         .finally(() => setOrdersLoading(false));
 
-      // Fetch addresses
+      // Fetch addresses independently
       fetch('/api/addresses')
         .then((res) => res.json())
         .then((data) => {
@@ -52,14 +53,16 @@ export default function AccountDashboardPage() {
             setAddressCount(data.addresses.length);
           }
         })
-        .catch(console.error);
+        .catch(console.error)
+        .finally(() => setAddressesLoading(false));
     }
   }, [user]);
 
   if (loading || !user) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center bg-surface-base">
+      <div className="min-h-[70vh] flex flex-col items-center justify-center bg-surface-base gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-brand-charcoal/40" />
+        <span className="text-xs text-foreground/50 font-mono tracking-wider uppercase">Loading account...</span>
       </div>
     );
   }
@@ -128,7 +131,7 @@ export default function AccountDashboardPage() {
             </div>
             <h3 className="font-serif text-lg text-brand-charcoal font-medium">Saved Addresses</h3>
             <p className="text-xs text-foreground/60 mt-1">
-              {addressCount} saved shipping destination{addressCount === 1 ? '' : 's'}
+              {addressesLoading ? 'Loading addresses...' : `${addressCount} saved shipping destination${addressCount === 1 ? '' : 's'}`}
             </p>
           </Link>
 

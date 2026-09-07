@@ -182,6 +182,31 @@ export async function getAuthenticatedUser(request?: NextRequest | Request): Pro
   }
 }
 
+export interface AuthResult {
+  user: AuthenticatedUser | null;
+  status: 200 | 401;
+  error?: string;
+}
+
+/**
+ * Require authenticated user.
+ * Returns 401 if unauthenticated, 200 with user if valid.
+ */
+export async function requireAuthenticatedUser(request?: Request | NextRequest): Promise<AuthResult> {
+  const user = await getAuthenticatedUser(request);
+  if (!user) {
+    return {
+      user: null,
+      status: 401,
+      error: 'Unauthorized: Authentication required. Please sign in.',
+    };
+  }
+  return {
+    user,
+    status: 200,
+  };
+}
+
 /**
  * Require authenticated customer; throws UNAUTHORIZED if not signed in.
  */
