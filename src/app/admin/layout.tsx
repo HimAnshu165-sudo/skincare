@@ -93,7 +93,7 @@ export default function AdminLayout({
           </div>
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <Link
-              href="/account/login?redirect=/admin"
+              href="/login?redirect=/admin"
               className="flex-1 bg-amber-500 text-[#11100F] py-2.5 px-4 rounded-xs text-xs font-semibold uppercase tracking-wider hover:bg-amber-400 transition-colors"
             >
               Sign In as Admin

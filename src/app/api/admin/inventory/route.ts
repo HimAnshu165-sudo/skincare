@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireAdminUser } from '@/lib/auth';
 import { jsonError, jsonSuccess, sanitizeString } from '@/lib/validation';
 import { logAdminAction } from '@/lib/audit';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -110,6 +112,11 @@ export async function PATCH(request: Request) {
       return jsonError(auth.error || 'Unauthorized', auth.status);
     }
 
+    const rateCheck = await checkRateLimit(`admin:inventory:update:${auth.user.id}`, 40, 60000);
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.resetSeconds, 'Inventory update rate limit exceeded.');
+    }
+
     let body: any;
     try {
       body = await request.json();
@@ -178,6 +185,10 @@ export async function PATCH(request: Request) {
       },
       request,
     });
+
+    try {
+      revalidateTag('products');
+    } catch {}
 
     return jsonSuccess({
       message: `Inventory updated for ${updated.name}.`,

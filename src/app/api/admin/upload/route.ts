@@ -3,6 +3,7 @@ import { uploadToBlob } from '@/lib/blob';
 import { requireAdminUser } from '@/lib/auth';
 import { jsonError, jsonSuccess } from '@/lib/validation';
 import { logAdminAction } from '@/lib/audit';
+import { checkDualRateLimit, getClientIp, rateLimitResponse } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +22,19 @@ export async function POST(request: Request) {
     const auth = await requireAdminUser(request);
     if (auth.status !== 200 || !auth.user) {
       return jsonError(auth.error || 'Unauthorized', auth.status);
+    }
+
+    const ip = getClientIp(request);
+    const rateCheck = await checkDualRateLimit(
+      `admin:upload:user:${auth.user.id}`,
+      25,
+      60000,
+      `admin:upload:ip:${ip}`,
+      25,
+      60000
+    );
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.resetSeconds, 'Upload rate limit exceeded. Please try again later.');
     }
 
     const formData = await request.formData();

@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { X } from 'lucide-react';
 
 export function AnnouncementBar() {
   const [isVisible, setIsVisible] = useState(true);
+  const pathname = usePathname();
 
-  if (!isVisible) return null;
+  if (!isVisible || pathname.startsWith('/admin')) return null;
 
   return (
     <aside aria-label="Announcement" className="bg-brand-charcoal text-brand-linen text-[11px] md:text-xs tracking-wider uppercase py-2 px-4 border-b border-white/10 transition-all">

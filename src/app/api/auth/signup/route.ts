@@ -3,16 +3,16 @@ import { prisma } from '@/lib/prisma';
 import { hashPassword, createSessionToken, setSessionCookie, clearGuestCookie, getCookieValue, GUEST_COOKIE_NAME } from '@/lib/auth';
 import { mergeGuestCartIntoUserCart } from '@/lib/cart';
 import { isValidEmail, isValidPassword, isValidPhone, normalizePhone, sanitizeString, jsonError, jsonSuccess } from '@/lib/validation';
-import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { checkRateLimit, getClientIp, rateLimitResponse } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
-    const rateCheck = checkRateLimit(`signup:${ip}`, 5, 60000);
+    const rateCheck = await checkRateLimit(`signup:ip:${ip}`, 5, 60000);
     if (!rateCheck.allowed) {
-      return jsonError(`Too many signup attempts. Please try again in ${rateCheck.resetSeconds}s.`, 429);
+      return rateLimitResponse(rateCheck.resetSeconds, 'Too many signup attempts. Please try again later.');
     }
 
     let body: any;

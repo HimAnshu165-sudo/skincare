@@ -23,25 +23,25 @@ export async function GET(request: Request) {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
     sevenDaysAgo.setHours(0, 0, 0, 0);
 
-    // Optimized parallel database aggregation queries (6 targeted queries instead of 18)
+    // Parallel database aggregation queries (optimized DB execution, minimal transferred rows)
     const [
       ordersByStatusGroup,
       totalRevenueAgg,
       todayRevenueAgg,
       totalCustomers,
-      productsStats,
-      last7DaysOrders,
+      [productStatsRow],
+      revenueTrendRaw,
       recentOrdersRaw,
       lowStockProductsRaw,
       recentCustomersRaw,
     ] = await Promise.all([
-      // 1. Grouped Order status counts in a single query
+      // 1. Grouped Order status counts in PostgreSQL
       prisma.order.groupBy({
         by: ['orderStatus'],
         _count: { id: true },
       }),
 
-      // 2. All-time revenue & valid orders aggregate
+      // 2. All-time revenue & valid orders aggregate in PostgreSQL
       prisma.order.aggregate({
         where: {
           orderStatus: { not: 'CANCELLED' },
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
         _count: { id: true },
       }),
 
-      // 3. Today's orders & revenue aggregate
+      // 3. Today's orders & revenue aggregate in PostgreSQL
       prisma.order.aggregate({
         where: {
           createdAt: { gte: startOfToday },
@@ -62,42 +62,51 @@ export async function GET(request: Request) {
         _count: { id: true },
       }),
 
-      // 4. Total customers count
+      // 4. Total customers count in PostgreSQL
       prisma.user.count({ where: { role: 'CUSTOMER' } }),
 
-      // 5. Products stats (total, low stock, out of stock)
-      prisma.product.findMany({
-        select: {
-          id: true,
-          stockQuantity: true,
-          inStock: true,
-        },
-      }),
+      // 5. Products stats aggregated directly in PostgreSQL (zero product rows transferred)
+      prisma.$queryRaw<Array<{ total: bigint; out_of_stock: bigint; low_stock: bigint }>>`
+        SELECT
+          COUNT(*)::bigint AS total,
+          COUNT(*) FILTER (WHERE "inStock" = false OR "stockQuantity" <= 0)::bigint AS out_of_stock,
+          COUNT(*) FILTER (WHERE "inStock" = true AND "stockQuantity" > 0 AND "stockQuantity" <= ${LOW_STOCK_THRESHOLD})::bigint AS low_stock
+        FROM "Product"
+      `,
 
-      // 6. Last 7 days orders specifically for revenue trend chart
-      prisma.order.findMany({
-        where: {
-          createdAt: { gte: sevenDaysAgo },
-          orderStatus: { not: 'CANCELLED' },
-          paymentStatus: { not: 'FAILED' },
-        },
-        select: {
-          total: true,
-          createdAt: true,
-        },
-      }),
+      // 6. Last 7 days revenue trend aggregated directly in PostgreSQL by day (transfers max 7 rows)
+      prisma.$queryRaw<Array<{ day: Date; revenue: number | null; orders: bigint }>>`
+        SELECT
+          DATE_TRUNC('day', "createdAt") AS day,
+          SUM("total")::float AS revenue,
+          COUNT(*)::bigint AS orders
+        FROM "Order"
+        WHERE "createdAt" >= ${sevenDaysAgo}
+          AND "orderStatus" != 'CANCELLED'
+          AND "paymentStatus" != 'FAILED'
+        GROUP BY DATE_TRUNC('day', "createdAt")
+        ORDER BY day ASC
+      `,
 
-      // 7. Recent 10 orders
+      // 7. Recent 10 orders (lean projection)
       prisma.order.findMany({
         take: 10,
         orderBy: { createdAt: 'desc' },
         include: {
-          items: true,
+          items: {
+            select: {
+              id: true,
+              productName: true,
+              quantity: true,
+              price: true,
+              imageUrl: true,
+            },
+          },
           user: { select: { id: true, name: true, email: true } },
         },
       }),
 
-      // 8. Low stock product list
+      // 8. Low stock product list (top 8)
       prisma.product.findMany({
         where: {
           stockQuantity: { lte: LOW_STOCK_THRESHOLD },
@@ -112,7 +121,7 @@ export async function GET(request: Request) {
         },
       }),
 
-      // 9. Recent customers
+      // 9. Recent customers (top 5)
       prisma.user.findMany({
         where: { role: 'CUSTOMER' },
         orderBy: { createdAt: 'desc' },
@@ -145,23 +154,16 @@ export async function GET(request: Request) {
     const deliveredOrders = statusCountMap['DELIVERED'] || 0;
     const cancelledOrders = statusCountMap['CANCELLED'] || 0;
 
-    // Parse product stats
-    const totalProducts = productsStats.length;
-    let lowStockProductsCount = 0;
-    let outOfStockProductsCount = 0;
-    for (const p of productsStats) {
-      if (!p.inStock || p.stockQuantity <= 0) {
-        outOfStockProductsCount++;
-      } else if (p.stockQuantity <= LOW_STOCK_THRESHOLD) {
-        lowStockProductsCount++;
-      }
-    }
+    // Parse product stats from native PostgreSQL aggregation
+    const totalProducts = Number(productStatsRow?.total ?? 0);
+    const outOfStockProductsCount = Number(productStatsRow?.out_of_stock ?? 0);
+    const lowStockProductsCount = Number(productStatsRow?.low_stock ?? 0);
 
     const totalRevenue = totalRevenueAgg._sum.total || 0;
     const todayOrders = todayRevenueAgg._count.id || 0;
     const todayRevenue = todayRevenueAgg._sum.total || 0;
 
-    // Calculate 7-day revenue trend
+    // Build 7-day revenue trend from aggregated daily rows
     const last7DaysMap = new Map<string, { date: string; revenue: number; orders: number }>();
     for (let i = 0; i < 7; i++) {
       const d = new Date();
@@ -171,12 +173,12 @@ export async function GET(request: Request) {
       last7DaysMap.set(key, { date: dayLabel, revenue: 0, orders: 0 });
     }
 
-    for (const order of last7DaysOrders) {
-      const orderDateKey = new Date(order.createdAt).toISOString().split('T')[0];
+    for (const row of revenueTrendRaw) {
+      const orderDateKey = new Date(row.day).toISOString().split('T')[0];
       if (last7DaysMap.has(orderDateKey)) {
         const entry = last7DaysMap.get(orderDateKey)!;
-        entry.revenue += order.total || 0;
-        entry.orders += 1;
+        entry.revenue += Number(row.revenue || 0);
+        entry.orders += Number(row.orders ?? 0);
       }
     }
 

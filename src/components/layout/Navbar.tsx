@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingBag, Search, Menu, X, User as UserIcon, LogOut, Package, MapPin, ChevronDown } from 'lucide-react';
+import { ShoppingBag, Search, Menu, X, User as UserIcon, LogOut, Package, MapPin, ChevronDown, Shield } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { MobileNav } from './MobileNav';
@@ -43,9 +43,14 @@ export function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  if (pathname.startsWith('/admin')) {
+    return null;
+  }
+
   const navLinks = [
     { label: 'Sunscreen', href: '/products/silk-air-fluid-sunscreen-spf50' },
     { label: 'Shop All', href: '/products' },
+    ...(user ? [{ label: 'Track Order', href: '/account/orders' }] : []),
     { label: 'Our Story', href: '/about' },
     { label: 'FAQ', href: '/faq' },
   ];
@@ -139,6 +144,17 @@ export function Navbar() {
                     </div>
 
                     <div className="py-1">
+                      {user.role === 'ADMIN' && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2.5 px-4 py-2 text-amber-700 bg-amber-50/60 hover:bg-amber-100/80 font-medium transition-colors border-b border-border-subtle"
+                        >
+                          <Shield className="w-3.5 h-3.5 text-amber-600" />
+                          <span>Admin Dashboard</span>
+                        </Link>
+                      )}
+
                       <Link
                         href="/account"
                         onClick={() => setUserMenuOpen(false)}

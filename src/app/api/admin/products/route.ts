@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { requireAdminUser } from '@/lib/auth';
 import { jsonError, jsonSuccess, sanitizeString } from '@/lib/validation';
 import { logAdminAction } from '@/lib/audit';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -139,6 +141,11 @@ export async function POST(request: Request) {
       return jsonError(auth.error || 'Unauthorized', auth.status);
     }
 
+    const rateCheck = await checkRateLimit(`admin:products:create:${auth.user.id}`, 30, 60000);
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.resetSeconds, 'Product creation rate limit exceeded.');
+    }
+
     let body: any;
     try {
       body = await request.json();
@@ -248,6 +255,10 @@ export async function POST(request: Request) {
       metadata: { name: newProduct.name, sku: newProduct.sku, price: newProduct.price },
       request,
     });
+
+    try {
+      revalidateTag('products');
+    } catch {}
 
     return jsonSuccess({
       message: 'Product created successfully.',

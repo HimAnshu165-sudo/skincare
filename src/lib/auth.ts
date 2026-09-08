@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 import bcrypt from 'bcryptjs';
@@ -140,42 +141,70 @@ export async function clearGuestCookie() {
   });
 }
 
+// Request-scoped memoization map strictly tied to the unique Request object reference
+const requestAuthMemo = new WeakMap<Request, Promise<AuthenticatedUser | null>>();
+
+async function resolveUserFromDb(userId: string): Promise<AuthenticatedUser | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      role: true,
+      adminMfaPin: true,
+      createdAt: true,
+    },
+  });
+
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    hasMfaConfigured: Boolean(user.adminMfaPin),
+    createdAt: user.createdAt,
+  };
+}
+
+// React cache for Server Component render lifecycles when request is not provided
+const serverComponentUserMemo = cache(async (token: string) => {
+  const payload = await verifySessionToken(token);
+  if (!payload || !payload.userId) return null;
+  return resolveUserFromDb(payload.userId);
+});
+
 /**
  * Get the currently authenticated user from server-side session cookie.
- * Validates against PostgreSQL User table on every request to ensure user exists and role is live.
+ * Request-scoped memoized: executes at most 1 DB query per incoming HTTP request.
+ * Completely isolates separate requests and prevents cross-user pollution.
  */
 export async function getAuthenticatedUser(request?: NextRequest | Request): Promise<AuthenticatedUser | null> {
   try {
-    const token = await getCookieValue(SESSION_COOKIE_NAME, request);
+    if (request && typeof request === 'object') {
+      const existingPromise = requestAuthMemo.get(request);
+      if (existingPromise) {
+        return existingPromise;
+      }
+      const fetchPromise = (async () => {
+        const token = await getCookieValue(SESSION_COOKIE_NAME, request);
+        if (!token) return null;
+        const payload = await verifySessionToken(token);
+        if (!payload || !payload.userId) return null;
+        return resolveUserFromDb(payload.userId);
+      })();
+      requestAuthMemo.set(request, fetchPromise);
+      return fetchPromise;
+    }
+
+    // Fallback for Server Components where cookies() is read from context
+    const token = await getCookieValue(SESSION_COOKIE_NAME);
     if (!token) return null;
-
-    const payload = await verifySessionToken(token);
-    if (!payload || !payload.userId) return null;
-
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        role: true,
-        adminMfaPin: true,
-        createdAt: true,
-      },
-    });
-
-    if (!user) return null;
-
-    return {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      role: user.role,
-      hasMfaConfigured: Boolean(user.adminMfaPin),
-      createdAt: user.createdAt,
-    };
+    return serverComponentUserMemo(token);
   } catch (error) {
     console.error('Error fetching authenticated user:', error);
     return null;

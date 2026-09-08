@@ -4,6 +4,7 @@ import { createOrder } from '@/lib/orders';
 import { createRazorpayOrder } from '@/lib/razorpay';
 import { prisma } from '@/lib/prisma';
 import { isValidEmail, isValidPhone, sanitizeString, validateCartQuantity, jsonError, jsonSuccess } from '@/lib/validation';
+import { checkDualRateLimit, getClientIp, rateLimitResponse } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,19 @@ export async function POST(request: Request) {
       return jsonError(auth.error || 'Authentication required to place an order. Please sign in or create an account.', 401);
     }
     const user = auth.user;
+
+    const ip = getClientIp(request);
+    const rateCheck = await checkDualRateLimit(
+      `razorpay:create:user:${user.id}`,
+      10,
+      60000,
+      `razorpay:create:ip:${ip}`,
+      10,
+      60000
+    );
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.resetSeconds, 'Too many order creation requests. Please try again later.');
+    }
 
     let body: any;
     try {

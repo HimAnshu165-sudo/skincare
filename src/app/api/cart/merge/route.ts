@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { getAuthenticatedUser, clearGuestCookie, GUEST_COOKIE_NAME } from '@/lib/auth';
 import { mergeGuestCartIntoUserCart, getOrCreateCart, formatCart } from '@/lib/cart';
 import { jsonError, jsonSuccess } from '@/lib/validation';
+import { checkDualRateLimit, getClientIp, rateLimitResponse } from '@/lib/rateLimit';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +12,19 @@ export async function POST(request: Request) {
     const user = await getAuthenticatedUser(request);
     if (!user) {
       return jsonError('Unauthorized: Must be signed in to merge cart.', 401);
+    }
+
+    const ip = getClientIp(request);
+    const rateCheck = await checkDualRateLimit(
+      `cart:merge:user:${user.id}`,
+      20,
+      60000,
+      `cart:merge:ip:${ip}`,
+      20,
+      60000
+    );
+    if (!rateCheck.allowed) {
+      return rateLimitResponse(rateCheck.resetSeconds, 'Too many cart merge attempts. Please try again later.');
     }
 
     let guestToken: string | null = null;

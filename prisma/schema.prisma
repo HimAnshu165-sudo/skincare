@@ -7,6 +7,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+<<<<<<< HEAD
+=======
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["relationJoins"]
+}
+
+// --------------------------------------------------
+// USER & AUTHENTICATION
+// --------------------------------------------------
+
+>>>>>>> 2d8f9b2237708636469e85ee2b6e2fbc52288c70
 model User {
   id          String    @id @default(cuid())
   name        String
