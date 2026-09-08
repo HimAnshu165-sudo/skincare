@@ -52,7 +52,7 @@ export function RoutineBuilder() {
       aria-roledescription="carousel"
       aria-label="Daily Sunscreen Routine Builder Slider"
     >
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 lg:px-12 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 relative">
         
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto space-y-3 mb-14 sm:mb-16">
@@ -69,17 +69,20 @@ export function RoutineBuilder() {
         </div>
 
         {/* 5-Step Horizontal Flow Tabs */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 mb-10">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 sm:gap-4 mb-8 sm:mb-10">
           {VELYRA_ROUTINE.map((step, idx) => {
             const isActive = activeStepIndex === idx;
             const isSPF = step.step === '04';
+            const isLastOdd = idx === 4;
 
             return (
               <button
                 key={step.step}
                 type="button"
                 onClick={() => goToStep(idx)}
-                className={`p-4 sm:p-5 rounded-xl border text-left transition-all duration-300 relative cursor-pointer group ${
+                className={`p-3.5 sm:p-5 rounded-xl border text-left transition-all duration-300 relative cursor-pointer group ${
+                  isLastOdd ? 'col-span-2 sm:col-span-1' : ''
+                } ${
                   isActive
                     ? 'bg-surface-elevated border-brand-charcoal shadow-lg -translate-y-1'
                     : 'bg-surface-muted/50 border-border-subtle hover:bg-surface-muted'
@@ -163,7 +166,7 @@ export function RoutineBuilder() {
             </div>
 
             {/* Right Column: Step Details & Advisory (7 cols) */}
-            <div className="lg:col-span-7 p-6 sm:p-8 lg:p-10 flex flex-col justify-between">
+            <div className="lg:col-span-7 p-5 sm:p-8 lg:p-10 flex flex-col justify-between">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={current.step}
@@ -175,14 +178,14 @@ export function RoutineBuilder() {
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border-subtle pb-4">
                     <div className="flex items-center gap-3">
-                      <span className="px-2.5 py-1 bg-brand-charcoal text-white text-[11px] font-mono font-bold rounded-xs">
+                      <span className="px-2.5 py-1 bg-brand-charcoal text-white text-[11px] font-mono font-bold rounded-xs shrink-0">
                         STEP {current.step}
                       </span>
-                      <h3 className="font-serif text-2xl sm:text-3xl text-brand-charcoal font-medium">
+                      <h3 className="font-serif text-xl sm:text-2xl md:text-3xl text-brand-charcoal font-medium">
                         {current.title} — {current.subtitle}
                       </h3>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-brand-mineral font-mono">
+                    <div className="flex items-center gap-1.5 text-xs text-brand-mineral font-mono shrink-0">
                       <Clock className="w-3.5 h-3.5 text-brand-amber" />
                       <span>{current.time}</span>
                     </div>
@@ -192,8 +195,8 @@ export function RoutineBuilder() {
                     {current.description}
                   </p>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-                    <div className="bg-surface-elevated p-4 rounded-xl border border-border-subtle space-y-1.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="bg-surface-elevated p-3.5 sm:p-4 rounded-xl border border-border-subtle space-y-1.5">
                       <span className="text-[10px] uppercase tracking-widest text-brand-amber font-bold flex items-center gap-1">
                         <CheckCircle2 className="w-3 h-3 text-brand-amber" />
                         Execution Gesture

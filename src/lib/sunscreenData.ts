@@ -869,32 +869,81 @@ export function getQuizRecommendation(answers: Record<number, string>): VelyraSu
 }
 
 export function getStaticFallbackProducts(): Product[] {
-  return VELYRA_SUNSCREENS.map((s) => ({
-    id: s.id,
-    name: s.name,
-    slug: s.id.replace('prod_', ''),
-    tagline: s.tagline,
-    description: s.description,
-    price: s.price,
-    mrp: s.mrp,
-    inStock: true,
-    stockQuantity: 100,
-    sku: s.code,
-    volume: s.volume,
-    spfRating: `${s.spf} ${s.pa}`,
-    finish: s.finish,
-    skinType: s.skinType,
-    images: [s.image, '/products/sunscreen-hero.webp'],
-    benefits: s.benefits,
-    keyIngredients: s.keyIngredients.map((k) =>
-      typeof k === 'string' ? { name: k, benefit: 'Skin barrier protection' } : k
-    ),
-    fullIngredients: 'Aqua, Diethylamino Hydroxybenzoyl Hexyl Benzoate, Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine, Niacinamide, Centella Asiatica Extract, Sodium Hyaluronate...',
-    howToUse: 'Apply generously as the final step of your morning skincare routine, 15 minutes before sun exposure.',
-    isFeatured: true,
-    isUpcoming: false,
-    category: 'Sunscreens',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }));
+  return VELYRA_SUNSCREENS.map((s) => {
+    // Secondary visual mapping for interactive card hover
+    const secondaryMap: Record<string, string> = {
+      'VEL-01': '/products/sunscreen-texture.webp',
+      'VEL-02': '/textures/02-glide.jpg',
+      'VEL-03': '/textures/03-absorption.jpg',
+      'VEL-04': '/textures/04-finish.jpg',
+      'VEL-05': '/products/sunscreen-lifestyle.webp',
+      'VEL-06': '/textures/01-dispense.jpg',
+      'VEL-07': '/products/sunscreen-box.webp',
+      'VEL-08': '/textures/02-glide.jpg',
+      'VEL-09': '/textures/04-finish.jpg',
+      'VEL-10': '/textures/03-absorption.jpg',
+    };
+
+    return {
+      id: s.id,
+      name: s.name,
+      slug: s.id === 'prod_sunscreen_01' ? 'silk-air-fluid-sunscreen-spf50' : s.id.replace('prod_', ''),
+      tagline: s.tagline,
+      description: s.description,
+      price: s.price,
+      mrp: s.mrp,
+      inStock: true,
+      stockQuantity: 100,
+      sku: s.code,
+      volume: s.volume,
+      spfRating: `${s.spf} ${s.pa}`,
+      finish: s.finish,
+      skinType: s.skinType,
+      images: [s.image, secondaryMap[s.code] || '/products/sunscreen-hero.webp'],
+      benefits: s.benefits,
+      keyIngredients: s.keyIngredients.map((k) =>
+        typeof k === 'string' ? { name: k, benefit: 'Skin barrier protection' } : k
+      ),
+      fullIngredients: 'Aqua, Diethylamino Hydroxybenzoyl Hexyl Benzoate, Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine, Niacinamide, Centella Asiatica Extract, Sodium Hyaluronate...',
+      howToUse: 'Apply generously as the final step of your morning skincare routine, 15 minutes before sun exposure.',
+      isFeatured: true,
+      isUpcoming: false,
+      category: 'Sunscreens',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  });
+}
+
+/**
+ * Returns the unified catalog preserving all 10 Velyra sunscreens while merging
+ * any existing database products (Moisturizers, Cleansers, Sets) non-destructively.
+ */
+export function getAllCatalogProducts(dbProducts: Product[] = []): Product[] {
+  const staticProducts = getStaticFallbackProducts();
+  const map = new Map<string, Product>();
+
+  // 1. First register all 10 Velyra Sunscreens
+  for (const sp of staticProducts) {
+    map.set(sp.id, sp);
+  }
+
+  // 2. Seamlessly merge database products (preserves DB slugs, blob images, price overrides, other categories)
+  for (const dp of dbProducts) {
+    const existing = map.get(dp.id);
+    const parsedImages = Array.isArray(dp.images)
+      ? dp.images
+      : typeof dp.images === 'string'
+      ? JSON.parse(dp.images)
+      : existing?.images || ['/products/sunscreen-hero.webp'];
+
+    map.set(dp.id, {
+      ...existing,
+      ...dp,
+      slug: dp.slug || existing?.slug || dp.id.replace('prod_', ''),
+      images: parsedImages && parsedImages.length > 0 ? parsedImages : existing?.images || ['/products/sunscreen-hero.webp'],
+    });
+  }
+
+  return Array.from(map.values());
 }

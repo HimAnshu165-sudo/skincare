@@ -269,7 +269,7 @@ export function CinematicVideoModal({
   return (
     <AnimatePresence>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 lg:p-10 overflow-hidden"
+        className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-6 lg:p-10 overflow-hidden"
         role="dialog"
         aria-modal="true"
         aria-label="Velyra Cinematic Video Player"
@@ -293,7 +293,7 @@ export function CinematicVideoModal({
           transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
           onMouseMove={handleMouseMove}
           tabIndex={0}
-          className={`relative w-full max-w-6xl max-h-[92vh] aspect-[16/9] sm:aspect-[16/9] bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col justify-between focus:outline-none ${
+          className={`relative w-full max-w-6xl h-[62vh] min-h-[340px] sm:h-auto sm:aspect-[16/9] max-h-[92vh] bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col justify-between focus:outline-none ${
             isFullscreen ? 'rounded-none max-h-screen h-screen' : ''
           }`}
         >
@@ -445,21 +445,21 @@ export function CinematicVideoModal({
             </div>
 
             {/* Controls Row */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-white text-xs">
+            <div className="flex items-center justify-between gap-3 text-white text-xs">
               
               {/* Left Controls: Play/Pause, Real Timestamps, Volume */}
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 sm:gap-4">
                 <button
                   type="button"
                   onClick={togglePlay}
-                  className="hover:text-brand-amber transition-colors p-1"
+                  className="hover:text-brand-amber transition-colors p-2 -ml-1 rounded-full focus:outline-none"
                   aria-label={isPlaying ? 'Pause' : 'Play'}
                 >
                   {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 fill-white" />}
                 </button>
 
                 {/* Real Time from Video Events */}
-                <div className="font-mono text-[11px] text-stone-300 tracking-wider">
+                <div className="font-mono text-[10px] sm:text-[11px] text-stone-300 tracking-wider">
                   <span>{formatTime(currentTime)}</span>
                   <span className="mx-1 text-stone-500">/</span>
                   <span>{formatTime(duration)}</span>
@@ -469,7 +469,7 @@ export function CinematicVideoModal({
                 <button
                   type="button"
                   onClick={toggleMute}
-                  className="hover:text-brand-amber transition-colors p-1"
+                  className="hover:text-brand-amber transition-colors p-2 rounded-full focus:outline-none"
                   aria-label={isMuted ? 'Unmute' : 'Mute'}
                 >
                   {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
@@ -484,11 +484,11 @@ export function CinematicVideoModal({
               </div>
 
               {/* Right Controls: Fullscreen */}
-              <div className="flex items-center gap-3 self-end sm:self-auto">
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={toggleFullscreen}
-                  className="hover:text-brand-amber transition-colors p-1"
+                  className="hover:text-brand-amber transition-colors p-2 -mr-1 rounded-full focus:outline-none"
                   aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
                 >
                   {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}

@@ -67,7 +67,7 @@ export function SunscreenQuiz() {
 
   return (
     <section id="quiz" className="py-24 sm:py-32 bg-surface-muted/50 border-b border-border-subtle relative overflow-hidden">
-      <div className="max-w-4xl mx-auto px-5 sm:px-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-8">
         
         {/* Header */}
         <div className="text-center space-y-3 mb-12">
@@ -84,7 +84,7 @@ export function SunscreenQuiz() {
         </div>
 
         {/* Quiz Window */}
-        <div className="bg-surface-elevated rounded-2xl border border-border-subtle p-6 sm:p-10 shadow-lg min-h-[420px] flex flex-col justify-between relative overflow-hidden">
+        <div className="bg-surface-elevated rounded-2xl border border-border-subtle p-4 sm:p-10 shadow-lg min-h-[420px] flex flex-col justify-between relative overflow-hidden">
           
           <AnimatePresence mode="wait">
             {!recommendation ? (
@@ -136,7 +136,7 @@ export function SunscreenQuiz() {
                         key={opt.tag}
                         type="button"
                         onClick={() => handleSelectOption(opt.tag)}
-                        className={`p-4 rounded-xl border text-left transition-all duration-200 group flex flex-col justify-between ${
+                        className={`p-3.5 sm:p-4 rounded-xl border text-left transition-all duration-200 group flex flex-col justify-between ${
                           isSelected
                             ? 'bg-brand-charcoal text-white border-brand-charcoal shadow-md scale-[1.02]'
                             : 'bg-surface-base hover:bg-surface-muted/80 border-border-subtle'

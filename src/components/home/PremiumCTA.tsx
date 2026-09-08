@@ -21,7 +21,7 @@ export function PremiumCTA() {
         <div className="absolute inset-0 bg-gradient-to-t from-surface-dark via-surface-dark/80 to-surface-dark/40" />
       </div>
 
-      <div className="relative z-10 max-w-4xl mx-auto px-5 sm:px-8 text-center space-y-8">
+      <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-8 text-center space-y-8">
         
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -35,11 +35,11 @@ export function PremiumCTA() {
             <span>The Daily Ritual</span>
           </div>
 
-          <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl text-white font-normal tracking-tight leading-[1.08]">
+          <h2 className="font-serif text-3xl sm:text-5xl lg:text-6xl text-white font-normal tracking-tight leading-[1.1]">
             Make SPF your everyday essential.
           </h2>
 
-          <p className="font-serif text-xl sm:text-2xl text-stone-300 italic font-normal">
+          <p className="font-serif text-lg sm:text-2xl text-stone-300 italic font-normal">
             Meet the Velyra finish.
           </p>
 
@@ -70,14 +70,14 @@ export function PremiumCTA() {
           </a>
         </motion.div>
 
-        <div className="pt-6 flex items-center justify-center gap-6 text-xs text-stone-400">
+        <div className="pt-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-stone-400">
           <div className="flex items-center gap-1.5">
             <ShieldCheck className="w-4 h-4 text-brand-amber" />
             <span>Dermatologist Approved</span>
           </div>
-          <span>•</span>
+          <span className="hidden sm:inline">•</span>
           <div>Free Express Pan-India Shipping</div>
-          <span>•</span>
+          <span className="hidden sm:inline">•</span>
           <div>COD Available</div>
         </div>
 

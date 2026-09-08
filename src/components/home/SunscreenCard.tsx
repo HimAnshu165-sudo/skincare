@@ -66,7 +66,10 @@ export function SunscreenCard({
       aria-label={`${product.name} ${product.spf}`}
     >
       {/* 1. Product Image & Masked Reveal Container */}
-      <div className={`relative w-full overflow-hidden bg-surface-muted ${aspectClass}`}>
+      <div 
+        onClick={() => onExplore(product)}
+        className={`relative w-full overflow-hidden bg-surface-muted cursor-pointer ${aspectClass}`}
+      >
         <Image
           src={product.image}
           alt={product.name}
@@ -199,10 +202,10 @@ export function SunscreenCard({
           <button
             type="button"
             onClick={() => onExplore(product)}
-            className="inline-flex items-center gap-1 text-[11px] uppercase tracking-widest font-semibold text-brand-charcoal hover:text-brand-amber transition-colors"
+            className="inline-flex items-center gap-1.5 py-1.5 px-2 -mr-2 text-[11px] uppercase tracking-widest font-semibold text-brand-charcoal hover:text-brand-amber transition-colors"
           >
             <span>Explore</span>
-            <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
           </button>
         </div>
       </div>

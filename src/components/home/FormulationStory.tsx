@@ -156,7 +156,7 @@ export function FormulationStory() {
 
         {/* Active Pillar Editorial Display Card with Smooth Slider Motion (Pauses strictly on hover over this card) */}
         <div
-          className="bg-surface-muted rounded-2xl border border-border-subtle p-8 sm:p-12 lg:p-16 overflow-hidden relative"
+          className="bg-surface-muted rounded-2xl border border-border-subtle p-5 sm:p-10 lg:p-16 overflow-hidden relative"
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
         >
@@ -168,29 +168,29 @@ export function FormulationStory() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -direction * 24 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center"
+              className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 items-center"
             >
               {/* Left Column: Visual Pillar Breakdown */}
-              <div className="lg:col-span-6 space-y-6">
+              <div className="lg:col-span-6 space-y-5 sm:space-y-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-surface-elevated border border-border-subtle flex items-center justify-center text-brand-charcoal shadow-xs">
-                    <IconComponent className="w-6 h-6 text-brand-amber" />
+                  <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-surface-elevated border border-border-subtle flex items-center justify-center text-brand-charcoal shadow-xs flex-shrink-0">
+                    <IconComponent className="w-5 h-5 sm:w-6 sm:h-6 text-brand-amber" />
                   </div>
                   <div>
-                    <span className="text-xs uppercase tracking-widest text-brand-amber font-semibold">
+                    <span className="text-[10px] sm:text-xs uppercase tracking-widest text-brand-amber font-semibold">
                       Pillar {current.number}
                     </span>
-                    <h3 className="font-serif text-3xl text-brand-charcoal font-normal">
+                    <h3 className="font-serif text-2xl sm:text-3xl text-brand-charcoal font-normal">
                       {current.title} — {current.highlight}
                     </h3>
                   </div>
                 </div>
 
-                <p className="text-base text-brand-mineral leading-relaxed">
+                <p className="text-sm sm:text-base text-brand-mineral leading-relaxed">
                   {current.summary}
                 </p>
 
-                <blockquote className="border-l-2 border-brand-amber pl-4 py-1 text-sm font-serif italic text-brand-charcoal">
+                <blockquote className="border-l-2 border-brand-amber pl-4 py-1 text-xs sm:text-sm font-serif italic text-brand-charcoal">
                   &ldquo;{current.quote}&rdquo;
                 </blockquote>
               </div>
@@ -200,17 +200,17 @@ export function FormulationStory() {
                 <span className="text-[10px] uppercase tracking-widest text-brand-mineral font-bold block mb-2">
                   Validated Specifications
                 </span>
-                <div className="space-y-3">
+                <div className="space-y-2.5 sm:space-y-3">
                   {current.metrics.map((metric, idx) => (
                     <div
                       key={idx}
-                      className="bg-surface-elevated p-4 rounded-lg border border-border-subtle flex items-center justify-between shadow-xs"
+                      className="bg-surface-elevated p-3.5 sm:p-4 rounded-lg border border-border-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2 shadow-xs"
                     >
                       <div className="flex items-center gap-2.5">
                         <CheckCircle2 className="w-4 h-4 text-brand-olive shrink-0" />
                         <span className="text-xs font-medium text-brand-mineral">{metric.label}</span>
                       </div>
-                      <span className="font-serif text-sm font-semibold text-brand-charcoal">
+                      <span className="font-serif text-sm font-semibold text-brand-charcoal pl-6 sm:pl-0">
                         {metric.value}
                       </span>
                     </div>

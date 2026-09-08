@@ -22,7 +22,33 @@ export function BeforeAfterSlider({
 }: BeforeAfterSliderProps) {
   const [sliderPosition, setSliderPosition] = useState(50); // percentage 0 - 100
   const [isDragging, setIsDragging] = useState(false);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Synchronize container width on mount, resize, and orientation shift
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const updateWidth = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.clientWidth);
+      }
+    };
+    updateWidth();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateWidth();
+    });
+    resizeObserver.observe(containerRef.current);
+
+    window.addEventListener('resize', updateWidth);
+    window.addEventListener('orientationchange', updateWidth);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', updateWidth);
+      window.removeEventListener('orientationchange', updateWidth);
+    };
+  }, []);
 
   const handleMove = useCallback(
     (clientX: number) => {
@@ -121,7 +147,7 @@ export function BeforeAfterSlider({
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
-              width: containerRef.current ? `${containerRef.current.clientWidth}px` : '100vw',
+              width: containerWidth ? `${containerWidth}px` : (containerRef.current ? `${containerRef.current.clientWidth}px` : '100%'),
               height: '100%',
             }}
           >
@@ -145,8 +171,8 @@ export function BeforeAfterSlider({
         className="absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_10px_rgba(0,0,0,0.5)] z-20 pointer-events-none"
         style={{ left: `${sliderPosition}%` }}
       >
-        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-surface-base border-2 border-brand-charcoal shadow-lg flex items-center justify-center text-brand-charcoal text-[11px] font-bold">
-          <span className="text-xs">⇄</span>
+        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-surface-base border-2 border-brand-charcoal shadow-xl flex items-center justify-center text-brand-charcoal text-xs font-bold">
+          <span>⇄</span>
         </div>
       </div>
 

@@ -63,7 +63,7 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 lg:p-10 overflow-y-auto">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-6 lg:p-10 overflow-y-auto">
         {/* Backdrop */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -85,12 +85,12 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
           aria-label={product.name}
         >
           {/* Top Bar with Close */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle bg-surface-muted/40">
+          <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-border-subtle bg-surface-muted/40">
             <div className="flex items-center gap-3">
               <span className="px-2 py-0.5 bg-brand-charcoal text-white text-[10px] uppercase font-bold tracking-widest rounded-xs">
                 {product.code}
               </span>
-              <span className="text-xs uppercase tracking-widest text-brand-mineral font-semibold">
+              <span className="text-[11px] sm:text-xs uppercase tracking-widest text-brand-mineral font-semibold truncate max-w-[200px] sm:max-w-none">
                 Clinical Product Specification
               </span>
             </div>
@@ -107,12 +107,12 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
           <div className="grid grid-cols-1 lg:grid-cols-12 max-h-[85vh] lg:max-h-[80vh] overflow-y-auto divide-y lg:divide-y-0 lg:divide-x divide-border-subtle">
             
             {/* PANEL 1 (LEFT): Before/After Model Experience */}
-            <div className="lg:col-span-4 p-6 sm:p-8 flex flex-col justify-between space-y-6 bg-surface-muted/20">
+            <div className="lg:col-span-4 p-4 sm:p-6 lg:p-8 flex flex-col justify-between space-y-5 sm:space-y-6 bg-surface-muted/20">
               <div className="space-y-2">
                 <span className="text-[10px] uppercase tracking-widest text-brand-amber font-bold">
                   Visual Dermal Result
                 </span>
-                <h4 className="font-serif text-xl text-brand-charcoal font-medium">
+                <h4 className="font-serif text-lg sm:text-xl text-brand-charcoal font-medium">
                   Zero White Cast Finish
                 </h4>
                 <p className="text-xs text-brand-mineral leading-relaxed">
@@ -131,7 +131,7 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
             </div>
 
             {/* PANEL 2 (CENTER): Product Details, Specs, Price, CTAs */}
-            <div className="lg:col-span-4 p-6 sm:p-8 space-y-6 flex flex-col justify-between bg-surface-base">
+            <div className="lg:col-span-4 p-4 sm:p-6 lg:p-8 space-y-5 sm:space-y-6 flex flex-col justify-between bg-surface-base">
               <div className="space-y-4">
                 {/* Visual */}
                 <div className="relative aspect-[4/3] rounded-lg overflow-hidden bg-surface-muted border border-border-subtle">
@@ -211,12 +211,12 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
             </div>
 
             {/* PANEL 3 (RIGHT): Model Application Video / Statement */}
-            <div className="lg:col-span-4 p-6 sm:p-8 flex flex-col justify-between space-y-6 bg-surface-muted/20">
+            <div className="lg:col-span-4 p-4 sm:p-6 lg:p-8 flex flex-col justify-between space-y-5 sm:space-y-6 bg-surface-muted/20">
               <div className="space-y-2">
                 <span className="text-[10px] uppercase tracking-widest text-brand-amber font-bold">
                   Sensory Application
                 </span>
-                <h4 className="font-serif text-xl text-brand-charcoal font-medium">
+                <h4 className="font-serif text-lg sm:text-xl text-brand-charcoal font-medium">
                   Effortless Dermal Uptake
                 </h4>
                 <p className="text-xs text-brand-mineral leading-relaxed">

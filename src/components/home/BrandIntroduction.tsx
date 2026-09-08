@@ -29,26 +29,26 @@ export function BrandIntroduction() {
             </div>
 
             <div className="space-y-4">
-              <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl text-brand-charcoal font-normal tracking-tight leading-[1.08]">
+              <h2 className="font-serif text-3xl sm:text-5xl lg:text-6xl text-brand-charcoal font-normal tracking-tight leading-[1.08]">
                 Protection, <span className="italic font-normal">reimagined.</span>
               </h2>
-              <p className="text-lg sm:text-xl text-brand-mineral font-normal leading-relaxed max-w-xl">
+              <p className="text-base sm:text-xl text-brand-mineral font-normal leading-relaxed max-w-xl">
                 Velyra is designed around the idea that daily sun protection should feel effortless, lightweight, and beautiful enough to become part of every routine.
               </p>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 pt-4 border-t border-border-subtle max-w-xl">
+            <div className="grid grid-cols-3 gap-3 sm:gap-6 pt-4 border-t border-border-subtle max-w-xl">
               <div>
-                <div className="font-serif text-2xl sm:text-3xl text-brand-charcoal font-medium">100%</div>
-                <div className="text-[11px] uppercase tracking-wider text-brand-mineral mt-1">Zero White Cast</div>
+                <div className="font-serif text-xl sm:text-3xl text-brand-charcoal font-medium">100%</div>
+                <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-brand-mineral mt-1">Zero White Cast</div>
               </div>
               <div>
-                <div className="font-serif text-2xl sm:text-3xl text-brand-charcoal font-medium">SPF 50+</div>
-                <div className="text-[11px] uppercase tracking-wider text-brand-mineral mt-1">European Filters</div>
+                <div className="font-serif text-xl sm:text-3xl text-brand-charcoal font-medium">SPF 50+</div>
+                <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-brand-mineral mt-1">European Filters</div>
               </div>
               <div>
-                <div className="font-serif text-2xl sm:text-3xl text-brand-charcoal font-medium">&lt; 10s</div>
-                <div className="text-[11px] uppercase tracking-wider text-brand-mineral mt-1">Skin Absorption</div>
+                <div className="font-serif text-xl sm:text-3xl text-brand-charcoal font-medium">&lt; 10s</div>
+                <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-brand-mineral mt-1">Skin Absorption</div>
               </div>
             </div>
 

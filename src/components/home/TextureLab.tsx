@@ -124,7 +124,7 @@ export function TextureLab() {
         </div>
 
         {/* 4 Interactive Stage Buttons (Clean, no black lines) */}
-        <div className="flex items-center justify-center gap-2 sm:gap-4 mb-12 flex-wrap">
+        <div className="flex items-center justify-center gap-1.5 sm:gap-4 mb-10 sm:mb-12 flex-wrap">
           {stages.map((stg) => {
             const isActive = activeStep === stg.step;
             return (
@@ -134,7 +134,7 @@ export function TextureLab() {
                 onClick={() => goToStep(stg.step)}
                 onMouseEnter={() => setIsPaused(true)}
                 onMouseLeave={() => setIsPaused(false)}
-                className={`px-5 py-3 rounded-full text-xs font-semibold uppercase tracking-wider transition-all flex items-center gap-2 ${
+                className={`px-3.5 py-2 sm:px-5 sm:py-3 rounded-full text-[11px] sm:text-xs font-semibold uppercase tracking-wider transition-all flex items-center gap-1.5 sm:gap-2 ${
                   isActive
                     ? 'bg-brand-charcoal text-white shadow-lg scale-105'
                     : 'bg-surface-muted text-brand-charcoal hover:bg-border-strong border border-border-subtle'
@@ -142,7 +142,7 @@ export function TextureLab() {
                 aria-label={`Go to ${stg.name} stage`}
                 aria-current={isActive ? 'true' : 'false'}
               >
-                <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-brand-amber' : 'bg-brand-mineral'}`} />
+                <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${isActive ? 'bg-brand-amber' : 'bg-brand-mineral'}`} />
                 <span>{stg.name}</span>
               </button>
             );
@@ -151,7 +151,7 @@ export function TextureLab() {
 
         {/* Interactive Lab Showcase Card (Pauses strictly on hover over this card) */}
         <div
-          className="bg-surface-muted rounded-2xl border border-border-subtle p-6 sm:p-10 lg:p-14 relative overflow-hidden shadow-sm"
+          className="bg-surface-muted rounded-2xl border border-border-subtle p-4 sm:p-8 lg:p-14 relative overflow-hidden shadow-sm"
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
         >
@@ -227,8 +227,8 @@ export function TextureLab() {
                     {current.description}
                   </p>
 
-                  <div className="grid grid-cols-2 gap-4 pt-2">
-                    <div className="bg-surface-elevated p-4 rounded-lg border border-border-subtle space-y-1 shadow-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-2">
+                    <div className="bg-surface-elevated p-3.5 sm:p-4 rounded-lg border border-border-subtle space-y-1 shadow-xs">
                       <span className="text-[10px] uppercase tracking-widest text-brand-mineral block font-semibold">
                         Time to Finish
                       </span>
@@ -236,7 +236,7 @@ export function TextureLab() {
                         {current.duration}
                       </div>
                     </div>
-                    <div className="bg-surface-elevated p-4 rounded-lg border border-border-subtle space-y-1 shadow-xs">
+                    <div className="bg-surface-elevated p-3.5 sm:p-4 rounded-lg border border-border-subtle space-y-1 shadow-xs">
                       <span className="text-[10px] uppercase tracking-widest text-brand-mineral block font-semibold">
                         Sensory Profile
                       </span>
