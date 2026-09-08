@@ -10,12 +10,14 @@ export const metadata: Metadata = {
   description: 'Explore the complete collection of VELYRA dermatologist-formulated photoprotection, barrier repair, and gentle cleansing rituals.',
 };
 
+import { getStaticFallbackProducts } from '@/lib/sunscreenData';
+
 export const revalidate = 60;
 
 export default async function ProductsPage() {
   let products: Product[] = [];
   try {
-    const raw = await prisma.product.findMany({
+    const dbPromise = prisma.product.findMany({
       include: {
         productImages: {
           orderBy: { sortOrder: 'asc' },
@@ -23,21 +25,36 @@ export default async function ProductsPage() {
       },
       orderBy: { createdAt: 'asc' },
     });
-    products = raw.map((p) => {
-      const blobImageUrls = p.productImages && p.productImages.length > 0
-        ? p.productImages.map(img => img.url)
-        : null;
-      const fallbackImages = typeof p.images === 'string' ? JSON.parse(p.images) : p.images;
 
-      return {
-        ...p,
-        images: blobImageUrls || fallbackImages,
-        benefits: typeof p.benefits === 'string' ? JSON.parse(p.benefits) : p.benefits,
-        keyIngredients: typeof p.keyIngredients === 'string' ? JSON.parse(p.keyIngredients) : p.keyIngredients,
-      };
-    }) as Product[];
-  } catch (e) {
-    console.error('Error fetching products:', e);
+    const timeoutPromise = new Promise<null>((_, reject) =>
+      setTimeout(() => reject(new Error('Neon serverless connection timeout')), 3500)
+    );
+
+    const raw = (await Promise.race([dbPromise, timeoutPromise])) as any;
+
+    if (raw && Array.isArray(raw) && raw.length > 0) {
+      products = raw.map((p: any) => {
+        const blobImageUrls =
+          p.productImages && p.productImages.length > 0
+            ? p.productImages.map((img: any) => img.url)
+            : null;
+        const fallbackImages = typeof p.images === 'string' ? JSON.parse(p.images) : p.images;
+
+        return {
+          ...p,
+          images: blobImageUrls || fallbackImages,
+          benefits: typeof p.benefits === 'string' ? JSON.parse(p.benefits) : p.benefits,
+          keyIngredients:
+            typeof p.keyIngredients === 'string' ? JSON.parse(p.keyIngredients) : p.keyIngredients,
+        };
+      }) as Product[];
+    }
+  } catch (e: any) {
+    console.warn('Neon database serverless cold boot/unavailable; serving resilient catalog fallback for /products.');
+  }
+
+  if (products.length === 0) {
+    products = getStaticFallbackProducts();
   }
 
   return (

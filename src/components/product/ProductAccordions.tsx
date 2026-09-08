@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, Sparkles, Feather, FlaskConical, HelpCircle } from 'lucide-react';
 import { Product } from '@/types';
+import { ProductVideoCard } from '@/components/video/ProductVideoCard';
 
 interface ProductAccordionsProps {
   product: Product;
@@ -52,10 +53,20 @@ export function ProductAccordions({ product }: ProductAccordionsProps) {
       title: 'The Daily Application Ritual',
       icon: Feather,
       content: (
-        <div className="space-y-3 text-xs text-brand-mineral leading-relaxed">
+        <div className="space-y-4 text-xs text-brand-mineral leading-relaxed">
           <p>{product.howToUse}</p>
           <div className="bg-brand-sand/30 p-3 rounded-sm border border-brand-sand/60 text-[11px] text-brand-charcoal">
             <strong>Dermatologist Tip:</strong> Reapply every 2 to 3 hours if engaging in outdoor physical activity or swimming under direct sunlight.
+          </div>
+          <div className="pt-2">
+            <ProductVideoCard
+              product={product}
+              videoSrc="/Hero.mp4"
+              posterSrc="/models/model-apply.jpg"
+              title={`${product.name} Ritual`}
+              statement={product.tagline || 'Light on the skin. Strong on everyday protection.'}
+              aspectClass="aspect-[16/9] rounded-lg shadow-sm"
+            />
           </div>
         </div>
       ),

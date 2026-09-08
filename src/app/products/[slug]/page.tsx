@@ -11,6 +11,8 @@ import { Product } from '@/types';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 
+import { getStaticFallbackProducts } from '@/lib/sunscreenData';
+
 interface PDPProps {
   params: Promise<{ slug: string }>;
 }
@@ -19,9 +21,20 @@ export const revalidate = 60;
 
 export async function generateMetadata({ params }: PDPProps): Promise<Metadata> {
   const { slug } = await params;
-  const product = await prisma.product.findUnique({
-    where: { slug },
-  });
+  let product: any = null;
+  try {
+    const dbPromise = prisma.product.findUnique({ where: { slug } });
+    const timeoutPromise = new Promise<null>((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout')), 3000)
+    );
+    product = await Promise.race([dbPromise, timeoutPromise]);
+  } catch {
+    // fallback
+  }
+
+  if (!product) {
+    product = getStaticFallbackProducts().find((p) => p.slug === slug || p.id === slug);
+  }
 
   if (!product) {
     return {
@@ -57,44 +70,72 @@ export async function generateMetadata({ params }: PDPProps): Promise<Metadata> 
 
 export default async function ProductDetailPage({ params }: PDPProps) {
   const { slug } = await params;
-  const rawProduct = await prisma.product.findUnique({
-    where: { slug },
-    include: {
-      productImages: {
-        orderBy: { sortOrder: 'asc' },
-      },
-    },
-  });
+  let rawProduct: any = null;
 
-  if (!rawProduct) {
-    notFound();
+  try {
+    const dbPromise = prisma.product.findUnique({
+      where: { slug },
+      include: {
+        productImages: {
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+    });
+
+    const timeoutPromise = new Promise<null>((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout')), 3500)
+    );
+
+    rawProduct = await Promise.race([dbPromise, timeoutPromise]);
+  } catch {
+    console.warn(`Neon serverless sleeping/unreachable for slug "${slug}"; serving catalog fallback.`);
   }
 
-  const blobImageUrls = rawProduct.productImages && rawProduct.productImages.length > 0
-    ? rawProduct.productImages.map(img => img.url)
-    : null;
+  let product: Product;
+  if (rawProduct) {
+    const blobImageUrls = rawProduct.productImages && rawProduct.productImages.length > 0
+      ? rawProduct.productImages.map((img: any) => img.url)
+      : null;
+    const fallbackImages = typeof rawProduct.images === 'string' ? JSON.parse(rawProduct.images) : rawProduct.images;
 
-  const fallbackImages = typeof rawProduct.images === 'string' ? JSON.parse(rawProduct.images) : rawProduct.images;
+    product = {
+      ...rawProduct,
+      images: blobImageUrls || fallbackImages,
+      benefits: typeof rawProduct.benefits === 'string' ? JSON.parse(rawProduct.benefits) : rawProduct.benefits,
+      keyIngredients: typeof rawProduct.keyIngredients === 'string' ? JSON.parse(rawProduct.keyIngredients) : rawProduct.keyIngredients,
+    } as Product;
+  } else {
+    const fallback = getStaticFallbackProducts().find(
+      (p) => p.slug === slug || p.id === slug || p.sku.toLowerCase() === slug.toLowerCase()
+    );
+    if (!fallback) {
+      notFound();
+    }
+    product = fallback;
+  }
 
-  const product: Product = {
-    ...rawProduct,
-    images: blobImageUrls || fallbackImages,
-    benefits: typeof rawProduct.benefits === 'string' ? JSON.parse(rawProduct.benefits) : rawProduct.benefits,
-    keyIngredients: typeof rawProduct.keyIngredients === 'string' ? JSON.parse(rawProduct.keyIngredients) : rawProduct.keyIngredients,
-  } as Product;
+  // Related products with fallback
+  let relatedProducts: Product[] = [];
+  try {
+    const rawRelated = await prisma.product.findMany({
+      where: { id: { not: product.id } },
+      take: 3,
+    });
+    if (rawRelated && rawRelated.length > 0) {
+      relatedProducts = rawRelated.map((p: any) => ({
+        ...p,
+        images: typeof p.images === 'string' ? JSON.parse(p.images) : p.images,
+        benefits: typeof p.benefits === 'string' ? JSON.parse(p.benefits) : p.benefits,
+        keyIngredients: typeof p.keyIngredients === 'string' ? JSON.parse(p.keyIngredients) : p.keyIngredients,
+      })) as Product[];
+    }
+  } catch {
+    // fallback
+  }
 
-  // Related products
-  const rawRelated = await prisma.product.findMany({
-    where: { id: { not: product.id } },
-    take: 3,
-  });
-
-  const relatedProducts = rawRelated.map((p) => ({
-    ...p,
-    images: typeof p.images === 'string' ? JSON.parse(p.images) : p.images,
-    benefits: typeof p.benefits === 'string' ? JSON.parse(p.benefits) : p.benefits,
-    keyIngredients: typeof p.keyIngredients === 'string' ? JSON.parse(p.keyIngredients) : p.keyIngredients,
-  })) as Product[];
+  if (relatedProducts.length === 0) {
+    relatedProducts = getStaticFallbackProducts().filter((p) => p.id !== product.id).slice(0, 3);
+  }
 
   // JSON-LD Product Schema
   const jsonLdProduct = {

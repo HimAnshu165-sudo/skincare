@@ -1,26 +1,29 @@
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { prisma } from '@/lib/prisma';
 import { HeroSection } from '@/components/home/HeroSection';
-import { BrandStatement } from '@/components/home/BrandStatement';
-import { HeroProductShowcase } from '@/components/home/HeroProductShowcase';
-import { WhyVelyra } from '@/components/home/WhyVelyra';
-import { TextureExplorer } from '@/components/home/TextureExplorer';
-import { BrandStory } from '@/components/home/BrandStory';
-import { FutureEcosystem } from '@/components/home/FutureEcosystem';
-import { TrustGuarantees } from '@/components/home/TrustGuarantees';
+import { BrandIntroduction } from '@/components/home/BrandIntroduction';
+import { SunscreenCollection } from '@/components/home/SunscreenCollection';
+import { FormulationStory } from '@/components/home/FormulationStory';
+import { TextureLab } from '@/components/home/TextureLab';
+import { ModelApplicationVideo } from '@/components/home/ModelApplicationVideo';
+import { SunscreenQuiz } from '@/components/home/SunscreenQuiz';
+import { RoutineBuilder } from '@/components/home/RoutineBuilder';
+import { StoriesSlider } from '@/components/home/StoriesSlider';
+import { TestimonialsSlider } from '@/components/home/TestimonialsSlider';
 import { FAQPreview } from '@/components/home/FAQPreview';
-import { NewsletterSection } from '@/components/home/NewsletterSection';
-import { ProductCard } from '@/components/product/ProductCard';
-import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
+import { PremiumCTA } from '@/components/home/PremiumCTA';
+
 import { Product } from '@/types';
+import { getStaticFallbackProducts } from '@/lib/sunscreenData';
 
 export const revalidate = 60; // ISR revalidation
 
 export default async function HomePage() {
   let products: Product[] = [];
   try {
-    const raw = await prisma.product.findMany({
+    // 3.5-second timeout protection for serverless database cold boot
+    const dbPromise = prisma.product.findMany({
       include: {
         productImages: {
           orderBy: { sortOrder: 'asc' },
@@ -28,87 +31,84 @@ export default async function HomePage() {
       },
       orderBy: { createdAt: 'asc' },
     });
-    products = raw.map((p) => {
-      const blobImageUrls = p.productImages && p.productImages.length > 0
-        ? p.productImages.map(img => img.url)
-        : null;
-      const fallbackImages = typeof p.images === 'string' ? JSON.parse(p.images) : p.images;
 
-      return {
-        ...p,
-        images: blobImageUrls || fallbackImages,
-        benefits: typeof p.benefits === 'string' ? JSON.parse(p.benefits) : p.benefits,
-        keyIngredients: typeof p.keyIngredients === 'string' ? JSON.parse(p.keyIngredients) : p.keyIngredients,
-      };
-    }) as Product[];
-  } catch (e) {
-    console.error('Error loading products for homepage:', e);
+    const timeoutPromise = new Promise<null>((_, reject) =>
+      setTimeout(() => reject(new Error('Neon serverless connection timeout')), 3500)
+    );
+
+    const raw = (await Promise.race([dbPromise, timeoutPromise])) as any;
+
+    if (raw && Array.isArray(raw) && raw.length > 0) {
+      products = raw.map((p: any) => {
+        const blobImageUrls =
+          p.productImages && p.productImages.length > 0
+            ? p.productImages.map((img: any) => img.url)
+            : null;
+        const fallbackImages = typeof p.images === 'string' ? JSON.parse(p.images) : p.images;
+
+        return {
+          ...p,
+          images: blobImageUrls || fallbackImages,
+          benefits: typeof p.benefits === 'string' ? JSON.parse(p.benefits) : p.benefits,
+          keyIngredients:
+            typeof p.keyIngredients === 'string' ? JSON.parse(p.keyIngredients) : p.keyIngredients,
+        };
+      }) as Product[];
+    }
+  } catch (e: any) {
+    // Graceful offline fallback: log a warning to keep Next.js dev server running cleanly
+    console.warn('Neon database serverless cold boot/unavailable; serving resilient catalog fallback.');
   }
 
-  const heroProduct = products.find((p) => p.slug === 'silk-air-fluid-sunscreen-spf50') || products[0];
+  // Ensure products is never empty if database is waking up
+  if (products.length === 0) {
+    products = getStaticFallbackProducts();
+  }
+
+  // Preserve existing hero product logic with guaranteed fallback
+  const heroProduct =
+    products.find((p) => p.slug === 'silk-air-fluid-sunscreen-spf50') ||
+    products[0] ||
+    getStaticFallbackProducts()[0];
 
   return (
     <div className="flex flex-col">
-      {/* 1. Hero Section */}
+      {/* 1. Existing Hero Section — 100% PRESERVED VISUALLY & STRUCTURALLY */}
       <HeroSection heroProduct={heroProduct} />
 
-      {/* 2. Brand Statement */}
-      <BrandStatement />
+      {/* 2. Brand Introduction ("Protection, Reimagined.") */}
+      <BrandIntroduction />
 
-      {/* 3. Hero Product Showcase Spotlight */}
-      <HeroProductShowcase product={heroProduct} />
+      {/* 3. Velyra Sunscreen Collection — 10 Products with Masked Hover Reveal */}
+      <SunscreenCollection />
 
-      {/* 4. Why VELYRA (Indian Climate Formulation) */}
-      <WhyVelyra />
+      {/* 4. The Velyra Formula Story (4 Pillars: Protection, Texture, Daily Wear, Skin Feel) */}
+      <FormulationStory />
 
-      {/* 5. Sensory Texture Explorer */}
-      <TextureExplorer />
+      {/* 5. Sensory Texture Lab (Texture → Application → Finish) */}
+      <TextureLab />
 
-      {/* 6. Product Grid Catalog Preview */}
-      {products.length > 0 && (
-        <section className="py-24 bg-surface-base border-b border-border-subtle">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-14 gap-4">
-              <div>
-                <span className="text-xs uppercase tracking-widest text-brand-amber font-semibold block mb-1">
-                  The Complete Collection
-                </span>
-                <h2 className="font-serif text-3xl sm:text-4xl text-brand-charcoal font-normal">
-                  Dermatologist Formulations
-                </h2>
-              </div>
-              <Link
-                href="/products"
-                className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider font-semibold text-brand-charcoal hover:text-brand-amber transition-colors"
-              >
-                <span>View Full Catalog</span>
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
+      {/* 6. Model Application Video Section ("Light on the skin. Strong on everyday protection.") */}
+      <ModelApplicationVideo />
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-              {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
+      {/* 9. Find Your Velyra Diagnostic Quiz */}
+      <SunscreenQuiz />
 
-      {/* 7. Brand Genesis & Story */}
-      <BrandStory />
+      {/* 10. Build Your Sunscreen Routine (5-Step Protocol) */}
+      <RoutineBuilder />
 
-      {/* 8. Future Formulation Roadmap */}
-      <FutureEcosystem products={products} />
+      {/* 11. Velyra Stories Horizontal Slider ("Velyra, Everywhere.") */}
+      <StoriesSlider />
 
-      {/* 9. Trust, Delivery & Verified Guarantees */}
-      <TrustGuarantees />
+      {/* 12. Minimal Luxury Testimonials Slider */}
+      <TestimonialsSlider />
 
-      {/* 10. Frequently Asked Questions Preview */}
+
+      {/* 14. Frequently Asked Questions Preview */}
       <FAQPreview />
 
-      {/* 11. The Editorial Newsletter */}
-      <NewsletterSection />
+      {/* 15. Premium Final Campaign CTA */}
+      <PremiumCTA />
     </div>
   );
 }
