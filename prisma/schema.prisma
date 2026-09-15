@@ -1,8 +1,14 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+<<<<<<< HEAD
+=======
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["relationJoins"]
@@ -12,19 +18,20 @@ generator client {
 // USER & AUTHENTICATION
 // --------------------------------------------------
 
+>>>>>>> 2d8f9b2237708636469e85ee2b6e2fbc52288c70
 model User {
-  id            String      @id @default(cuid())
-  name          String
-  email         String      @unique
-  password      String      // Hashed with bcrypt
-  phone         String?
-  role          String      @default("CUSTOMER") // "CUSTOMER" | "ADMIN"
-  adminMfaPin   String?     // Optional bcrypt-hashed 6-digit PIN for Admin MFA step-up authentication
-  addresses     Address[]
-  cart          Cart?
-  orders        Order[]
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id          String    @id @default(cuid())
+  name        String
+  email       String    @unique
+  password    String
+  phone       String?
+  role        String    @default("CUSTOMER")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  adminMfaPin String?
+  addresses   Address[]
+  cart        Cart?
+  orders      Order[]
 
   @@index([email])
 }
@@ -32,7 +39,6 @@ model User {
 model Address {
   id           String   @id @default(cuid())
   userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   fullName     String
   phone        String
   addressLine1 String
@@ -41,26 +47,23 @@ model Address {
   state        String
   postalCode   String
   country      String   @default("India")
-  addressType  String   @default("HOME") // "HOME" | "WORK" | "OTHER"
+  addressType  String   @default("HOME")
   isDefault    Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
-// --------------------------------------------------
-// CART SYSTEM (USER & GUEST)
-// --------------------------------------------------
-
 model Cart {
   id         String     @id @default(cuid())
   userId     String?    @unique
-  user       User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   guestToken String?    @unique
-  items      CartItem[]
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
+  user       User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items      CartItem[]
 
   @@index([userId])
   @@index([guestToken])
@@ -69,21 +72,17 @@ model Cart {
 model CartItem {
   id        String   @id @default(cuid())
   cartId    String
-  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
   productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   quantity  Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@unique([cartId, productId])
   @@index([cartId])
   @@index([productId])
 }
-
-// --------------------------------------------------
-// PRODUCT CATALOG
-// --------------------------------------------------
 
 model Product {
   id              String         @id @default(cuid())
@@ -96,23 +95,23 @@ model Product {
   inStock         Boolean        @default(true)
   stockQuantity   Int            @default(100)
   sku             String         @unique
-  volume          String         // e.g. "50ml / 1.7 fl. oz."
-  spfRating       String?        // e.g. "SPF 50+ PA++++"
-  finish          String?        // e.g. "Invisible Dewy-Matte"
-  skinType        String?        // e.g. "All Skin Types • Non-Comedogenic"
-  images          String         // JSON stringified array of URLs (legacy/fallback)
-  productImages   ProductImage[]
-  cartItems       CartItem[]
-  orderItems      OrderItem[]
-  benefits        String         // JSON stringified array of strings
-  keyIngredients  String         // JSON stringified array of { name: string, benefit: string }
+  volume          String
+  spfRating       String?
+  finish          String?
+  skinType        String?
+  images          String
+  benefits        String
+  keyIngredients  String
   fullIngredients String
   howToUse        String
   isFeatured      Boolean        @default(false)
   isUpcoming      Boolean        @default(false)
-  category        String         // "Sunscreens" | "Moisturizers" | "Cleansers" | "Sets"
+  category        String
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+  cartItems       CartItem[]
+  orderItems      OrderItem[]
+  productImages   ProductImage[]
 
   @@index([slug])
   @@index([category])
@@ -122,7 +121,6 @@ model Product {
 model ProductImage {
   id          String   @id @default(cuid())
   productId   String?
-  product     Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
   url         String
   pathname    String
   alt         String
@@ -134,42 +132,39 @@ model ProductImage {
   contentType String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  product     Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
 }
 
-// --------------------------------------------------
-// ORDERS & PAYMENTS
-// --------------------------------------------------
-
 model Order {
-  id                  String               @id @default(cuid())
-  orderNumber         String               @unique // e.g. "VEL-89234"
-  userId              String?
-  user                User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
-  customerName        String
-  customerEmail       String
-  customerPhone       String
-  shippingAddress     String               // JSON snapshot: { fullName, phone, addressLine1, addressLine2, city, state, postalCode }
-  paymentMethod       String               // "ONLINE" | "COD"
-  paymentStatus       String               @default("PENDING") // "PENDING" | "PAID" | "FAILED" | "REFUNDED"
-  orderStatus         String               @default("PLACED")  // "PLACED" | "CONFIRMED" | "PROCESSING" | "PACKED" | "SHIPPED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED"
-  subtotal            Float
-  discount            Float                @default(0)
-  shippingFee         Float                @default(0)
-  total               Float
-  couponCode          String?
-  razorpayOrderId     String?
-  razorpayPaymentId   String?
-  trackingNumber      String?
-  courierName         String?
-  trackingUrl         String?
-  notes               String?
-  items               OrderItem[]
-  payments            Payment[]
-  statusHistory       OrderStatusHistory[]
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  id                String               @id @default(cuid())
+  orderNumber       String               @unique
+  customerName      String
+  customerEmail     String
+  customerPhone     String
+  shippingAddress   String
+  paymentMethod     String
+  paymentStatus     String               @default("PENDING")
+  orderStatus       String               @default("PLACED")
+  subtotal          Float
+  discount          Float                @default(0)
+  shippingFee       Float                @default(0)
+  total             Float
+  couponCode        String?
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  trackingNumber    String?
+  courierName       String?
+  notes             String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  trackingUrl       String?
+  userId            String?
+  user              User?                @relation(fields: [userId], references: [id])
+  items             OrderItem[]
+  statusHistory     OrderStatusHistory[]
+  payments          Payment[]
 
   @@index([userId])
   @@index([orderNumber])
@@ -181,17 +176,17 @@ model Order {
 model OrderItem {
   id          String   @id @default(cuid())
   orderId     String
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId   String
-  product     Product  @relation(fields: [productId], references: [id])
   productName String
-  productSlug String?
-  productSku  String?
-  imageUrl    String?
   quantity    Int
-  price       Float    // Snapshot of price at time of order
+  price       Float
   volume      String?
   createdAt   DateTime @default(now())
+  imageUrl    String?
+  productSku  String?
+  productSlug String?
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product     Product  @relation(fields: [productId], references: [id])
 
   @@index([orderId])
   @@index([productId])
@@ -200,17 +195,17 @@ model OrderItem {
 model Payment {
   id                String   @id @default(cuid())
   orderId           String
-  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   amount            Float
   currency          String   @default("INR")
-  method            String   // "RAZORPAY" | "COD"
-  status            String   @default("PENDING") // "PENDING" | "PAID" | "FAILED" | "REFUNDED"
+  method            String
+  status            String   @default("PENDING")
   razorpayOrderId   String?
   razorpayPaymentId String?
   razorpaySignature String?
-  rawPayload        String?  // JSON metadata/logs for idempotency and webhooks
+  rawPayload        String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  order             Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([razorpayOrderId])
@@ -220,25 +215,21 @@ model Payment {
 model OrderStatusHistory {
   id          String   @id @default(cuid())
   orderId     String
-  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  status      String   // "PLACED" | "CONFIRMED" | "PROCESSING" | "PACKED" | "SHIPPED" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED"
+  status      String
   title       String
   description String?
   location    String?
   createdAt   DateTime @default(now())
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([createdAt])
 }
 
-// --------------------------------------------------
-// PROMOTIONS & MARKETING
-// --------------------------------------------------
-
 model Coupon {
   id            String    @id @default(cuid())
   code          String    @unique
-  discountType  String    // "PERCENTAGE" | "FIXED"
+  discountType  String
   discountValue Float
   minOrderValue Float     @default(0)
   isActive      Boolean   @default(true)
@@ -248,17 +239,13 @@ model Coupon {
   @@index([code])
 }
 
-// --------------------------------------------------
-// ADMIN AUDIT LOGS
-// --------------------------------------------------
-
 model AdminAuditLog {
   id           String   @id @default(cuid())
   adminUserId  String
-  action       String   // "ADMIN_LOGIN" | "ADMIN_LOGIN_FAILED" | "ORDER_STATUS_CHANGED" | "PAYMENT_STATUS_CHANGED" | "PRODUCT_CREATED" | "PRODUCT_UPDATED" | "PRODUCT_DELETED" | "INVENTORY_UPDATED" | "CUSTOMER_DATA_ACCESS"
-  resourceType String   // "ORDER" | "PRODUCT" | "INVENTORY" | "PAYMENT" | "CUSTOMER" | "AUTH" | "MEDIA"
+  action       String
+  resourceType String
   resourceId   String?
-  metadata     String?  // Sanitized JSON string (NO passwords, tokens, secrets)
+  metadata     String?
   ipAddress    String?
   userAgent    String?
   createdAt    DateTime @default(now())
@@ -268,4 +255,3 @@ model AdminAuditLog {
   @@index([resourceType])
   @@index([createdAt])
 }
-

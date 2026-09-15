@@ -50,6 +50,22 @@
     background-color: var(--surface-base);
     color: var(--color-charcoal);
     overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Responsive Media Containment */
+  img, video, canvas, svg {
+    max-width: 100%;
+  }
+
+  /* Prevent automatic iOS zooming on form focus by ensuring readable minimum font scale */
+  input, select, textarea {
+    font-size: 16px;
+  }
+  @media (min-width: 640px) {
+    input, select, textarea {
+      font-size: inherit;
+    }
   }
 
   h1, h2, h3, .font-serif {

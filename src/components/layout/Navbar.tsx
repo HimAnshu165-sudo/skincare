@@ -64,7 +64,7 @@ export function Navbar() {
             : 'bg-surface-base/95 border-b border-border-subtle/60 py-4.5'
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           {/* Mobile Menu Button */}
           <div className="flex items-center lg:hidden">
             <button
@@ -98,8 +98,8 @@ export function Navbar() {
             })}
           </nav>
 
-          {/* Brand Logo */}
-          <div className="flex-1 lg:flex-initial text-center">
+          {/* Brand Logo - Centered in Navbar */}
+          <div className="flex-1 lg:flex-initial text-center lg:absolute lg:left-1/2 lg:-translate-x-1/2">
             <Link href="/" className="inline-block group">
               <span className="font-serif text-2xl sm:text-3xl tracking-[0.2em] font-medium text-brand-charcoal uppercase group-hover:opacity-85 transition-opacity">
                 VELYRA

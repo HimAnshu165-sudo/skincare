@@ -1,7 +1,9 @@
+'use client';
+
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, Sparkles, Award } from 'lucide-react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 
 export function BrandStory() {
   return (

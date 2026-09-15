@@ -16,8 +16,10 @@ export function WhatsAppButton() {
     return null;
   }
 
+  const isProductPage = pathname.startsWith('/products/') && pathname !== '/products';
+
   return (
-    <div className="fixed bottom-6 right-6 z-40 flex items-end flex-col gap-2">
+    <div className={`fixed ${isProductPage ? 'bottom-20 sm:bottom-6' : 'bottom-4 sm:bottom-6'} right-4 sm:right-6 z-40 flex items-end flex-col gap-2`}>
       {/* Subtle Concierge Popover */}
       {showTooltip && (
         <div className="bg-surface-elevated text-brand-charcoal p-3.5 rounded-sm shadow-xl border border-border-subtle text-xs max-w-xs animate-fade-in relative">
