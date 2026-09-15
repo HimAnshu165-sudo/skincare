@@ -1,4 +1,3 @@
-import { prisma } from './prisma';
 import { NextRequest } from 'next/server';
 
 export interface LogAdminActionParams {
@@ -73,20 +72,12 @@ export async function logAdminAction(params: LogAdminActionParams): Promise<void
       userAgent = request.headers.get('user-agent') || null;
     }
 
-    const safeMetadata = metadata ? JSON.stringify(sanitizeAuditMetadata(metadata)) : null;
+    const safeMetadata = metadata ? sanitizeAuditMetadata(metadata) : undefined;
 
-    await prisma.adminAuditLog.create({
-      data: {
-        adminUserId,
-        action,
-        resourceType,
-        resourceId: resourceId || null,
-        metadata: safeMetadata,
-        ipAddress,
-        userAgent,
-      },
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[AdminAudit] ${action} (${resourceType}:${resourceId || 'N/A'}) by ${adminUserId} from ${ipAddress || 'unknown'}`, safeMetadata || '');
+    }
   } catch (error) {
-    console.error('Failed to record AdminAuditLog entry in PostgreSQL:', error);
+    console.error('Failed to log admin action:', error);
   }
 }

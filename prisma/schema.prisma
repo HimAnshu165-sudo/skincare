@@ -248,24 +248,3 @@ model Coupon {
   @@index([code])
 }
 
-// --------------------------------------------------
-// ADMIN AUDIT LOGS
-// --------------------------------------------------
-
-model AdminAuditLog {
-  id           String   @id @default(cuid())
-  adminUserId  String
-  action       String   // "ADMIN_LOGIN" | "ADMIN_LOGIN_FAILED" | "ORDER_STATUS_CHANGED" | "PAYMENT_STATUS_CHANGED" | "PRODUCT_CREATED" | "PRODUCT_UPDATED" | "PRODUCT_DELETED" | "INVENTORY_UPDATED" | "CUSTOMER_DATA_ACCESS"
-  resourceType String   // "ORDER" | "PRODUCT" | "INVENTORY" | "PAYMENT" | "CUSTOMER" | "AUTH" | "MEDIA"
-  resourceId   String?
-  metadata     String?  // Sanitized JSON string (NO passwords, tokens, secrets)
-  ipAddress    String?
-  userAgent    String?
-  createdAt    DateTime @default(now())
-
-  @@index([adminUserId])
-  @@index([action])
-  @@index([resourceType])
-  @@index([createdAt])
-}
-
