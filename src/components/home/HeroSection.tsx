@@ -75,7 +75,7 @@ export function HeroSection({ heroProduct }: HeroSectionProps) {
       </div>
 
       {/* 3. Hero Editorial Content (Positioned in the left 40-45% rail) */}
-      <div className="relative z-10 w-full max-w-7xl mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-16 sm:py-24 lg:py-32">
+      <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 lg:py-32">
         <div className="max-w-[600px] xl:max-w-[640px] space-y-6 sm:space-y-7 lg:space-y-8 text-left">
           
           {/* Eyebrow Label */}
@@ -88,7 +88,7 @@ export function HeroSection({ heroProduct }: HeroSectionProps) {
 
           {/* Large Editorial Headline */}
           <div className="space-y-3">
-            <h1 className="font-serif text-[2.5rem] sm:text-4xl md:text-5xl lg:text-[3.5rem] xl:text-[4rem] text-brand-charcoal font-normal tracking-tight leading-[1.06]">
+            <h1 className="font-serif text-[2.1rem] sm:text-4xl md:text-5xl lg:text-[3.5rem] xl:text-[4rem] text-brand-charcoal font-normal tracking-tight leading-[1.08]">
               Everyday protection, <span className="italic font-normal">elevated.</span>
             </h1>
             <p className="text-base sm:text-lg text-brand-mineral font-normal max-w-lg leading-relaxed">
@@ -97,18 +97,18 @@ export function HeroSection({ heroProduct }: HeroSectionProps) {
           </div>
 
           {/* Spec Highlights Micro Grid */}
-          <div className="grid grid-cols-3 gap-4 pt-3 pb-3 border-y border-border-subtle/80 max-w-lg">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-3 pb-3 border-y border-border-subtle/80 max-w-lg">
             <div>
-              <div className="text-[11px] uppercase tracking-wider text-brand-mineral">Protection</div>
-              <div className="font-serif text-base sm:text-lg text-brand-charcoal font-medium mt-0.5">SPF 50+ PA++++</div>
+              <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-brand-mineral">Protection</div>
+              <div className="font-serif text-sm sm:text-base md:text-lg text-brand-charcoal font-medium mt-0.5 whitespace-nowrap">SPF 50+ PA++++</div>
             </div>
             <div>
-              <div className="text-[11px] uppercase tracking-wider text-brand-mineral">Finish</div>
-              <div className="font-serif text-base sm:text-lg text-brand-charcoal font-medium mt-0.5">Invisible Dew</div>
+              <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-brand-mineral">Finish</div>
+              <div className="font-serif text-sm sm:text-base md:text-lg text-brand-charcoal font-medium mt-0.5 whitespace-nowrap">Invisible Dew</div>
             </div>
             <div>
-              <div className="text-[11px] uppercase tracking-wider text-brand-mineral">Cast</div>
-              <div className="font-serif text-base sm:text-lg text-brand-charcoal font-medium mt-0.5">Zero White Cast</div>
+              <div className="text-[10px] sm:text-[11px] uppercase tracking-wider text-brand-mineral">Cast</div>
+              <div className="font-serif text-sm sm:text-base md:text-lg text-brand-charcoal font-medium mt-0.5 whitespace-nowrap">Zero White Cast</div>
             </div>
           </div>
 

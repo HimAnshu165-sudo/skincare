@@ -59,9 +59,9 @@ export function CartDrawer() {
 
       <div className="fixed inset-y-0 right-0 max-w-md w-full bg-surface-base shadow-2xl flex flex-col z-10 animate-fade-in border-l border-border-subtle">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-border-subtle flex items-center justify-between bg-surface-elevated">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-border-subtle flex items-center justify-between bg-surface-elevated">
           <div className="flex items-center gap-2">
-            <h2 className="font-serif text-xl tracking-wide uppercase text-brand-charcoal">
+            <h2 className="font-serif text-lg sm:text-xl tracking-wide uppercase text-brand-charcoal">
               Your Shopping Bag
             </h2>
             <span className="text-xs text-brand-mineral font-medium">
@@ -78,7 +78,7 @@ export function CartDrawer() {
         </div>
 
         {/* Free Shipping Progress */}
-        <div className="px-6 py-3.5 bg-surface-muted border-b border-border-subtle text-xs">
+        <div className="px-4 sm:px-6 py-3 sm:py-3.5 bg-surface-muted border-b border-border-subtle text-xs">
           {amountRemainingForFreeShipping > 0 ? (
             <div className="space-y-2">
               <p className="text-brand-charcoal">
@@ -100,7 +100,7 @@ export function CartDrawer() {
         </div>
 
         {/* Cart Item List */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 sm:space-y-6">
           {items.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center space-y-4 py-12">
               <div className="w-16 h-16 rounded-full bg-surface-muted flex items-center justify-center text-brand-mineral font-serif text-2xl">
@@ -200,7 +200,7 @@ export function CartDrawer() {
 
         {/* Footer / Summary / Checkout */}
         {items.length > 0 && (
-          <div className="p-6 border-t border-border-subtle bg-surface-elevated space-y-4">
+          <div className="p-4 sm:p-6 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-6 border-t border-border-subtle bg-surface-elevated space-y-4">
             {/* Coupon Section */}
             <div>
               {appliedCoupon ? (

@@ -38,7 +38,7 @@ export function StickyPurchaseBar({ product }: StickyPurchaseBarProps) {
   const thumbnail = images[0] || '/products/sunscreen-hero.webp';
 
   return (
-    <div className="fixed bottom-0 inset-x-0 z-40 bg-surface-elevated/95 backdrop-blur-md border-t border-border-subtle p-3.5 shadow-2xl transition-all duration-300 md:hidden animate-slide-down">
+    <div className="fixed bottom-0 inset-x-0 z-40 bg-surface-elevated/95 backdrop-blur-md border-t border-border-subtle p-3.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))] shadow-2xl transition-all duration-300 md:hidden animate-slide-down">
       <div className="flex items-center justify-between gap-3 max-w-md mx-auto">
         <div className="flex items-center gap-2.5 overflow-hidden">
           <div className="relative w-10 h-10 bg-surface-muted rounded-sm flex-shrink-0 overflow-hidden border border-border-subtle">

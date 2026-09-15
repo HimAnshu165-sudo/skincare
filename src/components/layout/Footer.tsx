@@ -16,7 +16,7 @@ export function Footer() {
     <footer className="bg-surface-dark text-white pt-16 pb-12 border-t border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Top Feature Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 pb-14 border-b border-white/10 text-center sm:text-left">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-5 sm:gap-8 pb-14 border-b border-white/10 text-center sm:text-left">
           <div className="flex flex-col items-center sm:items-start gap-2">
             <Truck className="w-5 h-5 text-brand-amber" />
             <span className="text-xs uppercase tracking-wider font-semibold text-white">Express Delivery</span>

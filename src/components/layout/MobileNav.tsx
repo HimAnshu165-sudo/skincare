@@ -24,7 +24,7 @@ export function MobileNav({ isOpen, onClose, links }: MobileNavProps) {
       />
 
       {/* Slide Drawer */}
-      <div className="fixed inset-y-0 left-0 max-w-xs w-full bg-surface-elevated shadow-xl z-50 p-6 flex flex-col justify-between overflow-y-auto animate-fade-in border-r border-border-subtle">
+      <div className="fixed inset-y-0 left-0 w-[86vw] max-w-xs bg-surface-elevated shadow-xl z-50 p-5 sm:p-6 pt-[calc(1.25rem+env(safe-area-inset-top))] pb-[calc(1.25rem+env(safe-area-inset-bottom))] flex flex-col justify-between overflow-y-auto animate-fade-in border-r border-border-subtle">
         <div>
           {/* Header */}
           <div className="flex items-center justify-between pb-6 border-b border-border-subtle">
