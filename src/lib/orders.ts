@@ -160,7 +160,7 @@ export async function createOrder(params: CreateOrderParams) {
         shippingAddress: JSON.stringify(shippingAddress),
         paymentMethod,
         paymentStatus: 'PENDING',
-        orderStatus: paymentMethod === 'COD' ? 'CONFIRMED' : 'PLACED',
+        orderStatus: paymentMethod === 'COD' ? 'CONFIRMED' : 'PAYMENT_PENDING',
         subtotal: calculatedSubtotal,
         discount,
         shippingFee,
@@ -171,22 +171,26 @@ export async function createOrder(params: CreateOrderParams) {
           create: validatedItems,
         },
         statusHistory: {
-          create: [
-            {
-              status: 'PLACED',
-              title: 'Order Placed',
-              description: `Order received via ${paymentMethod === 'COD' ? 'Cash on Delivery' : 'Online Payment'}.`,
-            },
-            ...(paymentMethod === 'COD'
-              ? [
-                  {
-                    status: 'CONFIRMED',
-                    title: 'Order Confirmed',
-                    description: 'Cash on Delivery order verified and dispatched to fulfillment.',
-                  },
-                ]
-              : []),
-          ],
+          create: paymentMethod === 'COD'
+            ? [
+                {
+                  status: 'PLACED',
+                  title: 'Order Placed',
+                  description: 'Order received via Cash on Delivery.',
+                },
+                {
+                  status: 'CONFIRMED',
+                  title: 'Order Confirmed',
+                  description: 'Cash on Delivery order verified and dispatched to fulfillment.',
+                },
+              ]
+            : [
+                {
+                  status: 'PAYMENT_PENDING',
+                  title: 'Payment Pending',
+                  description: 'Order checkout initiated. Awaiting confirmation from payment gateway.',
+                },
+              ],
         },
         payments: {
           create: [
@@ -206,8 +210,8 @@ export async function createOrder(params: CreateOrderParams) {
       },
     });
 
-    // Clear user cart if authenticated
-    if (userId) {
+    // Clear user cart immediately only for COD orders; for ONLINE orders, cart is cleared upon verified payment
+    if (userId && paymentMethod === 'COD') {
       const userCart = await tx.cart.findUnique({ where: { userId } });
       if (userCart) {
         await tx.cartItem.deleteMany({ where: { cartId: userCart.id } });
@@ -223,11 +227,21 @@ export async function createOrder(params: CreateOrderParams) {
 
 /**
  * Fetch orders for authenticated customer with strict user scoping and payment secret protection.
+ * Excludes incomplete online payment attempts so only confirmed/placed orders appear in history.
  */
 export async function getUserOrders(userId: string) {
   if (!userId) return [];
   return prisma.order.findMany({
-    where: { userId },
+    where: {
+      userId,
+      NOT: {
+        OR: [
+          { orderStatus: 'PAYMENT_PENDING' },
+          { orderStatus: 'CANCELLED' },
+          { AND: [{ paymentMethod: 'ONLINE' }, { paymentStatus: { not: 'PAID' } }] },
+        ],
+      },
+    },
     include: {
       items: true,
       payments: {
@@ -250,6 +264,7 @@ export async function getUserOrders(userId: string) {
 /**
  * Fetch a single order for authenticated user with strict IDOR verification.
  * Guarantees that order.userId === session.userId. Never returns another user's order.
+ * Excludes incomplete online payment attempts.
  */
 export async function getUserOrderById(orderId: string, userId: string) {
   if (!orderId || !userId) return null;
@@ -258,6 +273,13 @@ export async function getUserOrderById(orderId: string, userId: string) {
   return prisma.order.findFirst({
     where: {
       userId,
+      NOT: {
+        OR: [
+          { orderStatus: 'PAYMENT_PENDING' },
+          { orderStatus: 'CANCELLED' },
+          { AND: [{ paymentMethod: 'ONLINE' }, { paymentStatus: { not: 'PAID' } }] },
+        ],
+      },
       OR: [
         { id: trimmed },
         { orderNumber: trimmed },

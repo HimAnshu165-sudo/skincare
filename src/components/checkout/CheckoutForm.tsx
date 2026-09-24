@@ -389,18 +389,47 @@ export function CheckoutForm() {
             color: '#1A1817',
           },
           modal: {
-            ondismiss: function () {
+            ondismiss: async function () {
               hideProcessing();
               setLoading(false);
+              setErrorMsg('Payment was cancelled. You can retry or choose Cash on Delivery.');
+              if (orderData?.order?.id) {
+                try {
+                  await fetch('/api/razorpay/cancel-order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      orderId: orderData.order.id,
+                      reason: 'User closed payment window',
+                    }),
+                  });
+                } catch (e) {
+                  console.error('Failed to notify order cancellation:', e);
+                }
+              }
             },
           },
         };
 
         const rzp = new window.Razorpay(options);
-        rzp.on('payment.failed', function (resp: any) {
+        rzp.on('payment.failed', async function (resp: any) {
           hideProcessing();
-          setErrorMsg(resp.error?.description || 'Payment was declined. Please retry or choose Cash on Delivery.');
           setLoading(false);
+          setErrorMsg(resp.error?.description || 'Payment was declined. Please retry or choose Cash on Delivery.');
+          if (orderData?.order?.id) {
+            try {
+              await fetch('/api/razorpay/cancel-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  orderId: orderData.order.id,
+                  reason: resp.error?.description || 'Payment declined',
+                }),
+              });
+            } catch (e) {
+              console.error('Failed to notify failed payment:', e);
+            }
+          }
         });
         rzp.open();
       }

@@ -98,6 +98,18 @@ export async function POST(request: Request) {
       }),
     ]);
 
+    // Clear the user's cart in DB now that payment is successfully confirmed
+    const orderRecord = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { userId: true },
+    });
+    if (orderRecord?.userId) {
+      const userCart = await prisma.cart.findUnique({ where: { userId: orderRecord.userId } });
+      if (userCart) {
+        await prisma.cartItem.deleteMany({ where: { cartId: userCart.id } });
+      }
+    }
+
     const updatedOrder = await prisma.order.findUnique({
       where: { id: orderId },
       include: { items: true, payments: true, statusHistory: true },
