@@ -231,6 +231,25 @@ async function main() {
   });
   console.log('Created demo tracking order:', demoOrder.orderNumber);
 
+  // 4. Seed Default Admin
+  const bcrypt = require('bcryptjs');
+  const adminPasswordHash = await bcrypt.hash('Admin@Velyra2026', 10);
+  await prisma.user.upsert({
+    where: { email: 'admin@velyra.in' },
+    update: {
+      role: 'ADMIN',
+      name: 'VELYRA Admin',
+    },
+    create: {
+      email: 'admin@velyra.in',
+      password: adminPasswordHash,
+      name: 'VELYRA Admin',
+      phone: '919876543210',
+      role: 'ADMIN',
+    },
+  });
+  console.log('Seeded default admin: admin@velyra.in');
+
   console.log('Seeding completed successfully!');
 }
 
