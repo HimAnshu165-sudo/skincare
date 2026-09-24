@@ -95,7 +95,7 @@ export default function RootLayout({
         {/* Razorpay Checkout Script */}
         <Script
           src="https://checkout.razorpay.com/v1/checkout.js"
-          strategy="lazyOnload"
+          strategy="afterInteractive"
         />
         {/* Google Analytics 4 Script */}
         {process.env.NEXT_PUBLIC_GA_ID && (

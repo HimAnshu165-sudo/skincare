@@ -44,6 +44,7 @@ export async function POST(request: Request) {
       items,
       couponCode,
       notes,
+      saveAddressToAccount,
     } = body || {};
 
     const sanitizedName = sanitizeString(customerName, 100);
@@ -115,6 +116,40 @@ export async function POST(request: Request) {
       notes: notes ? sanitizeString(notes, 500) : null,
     });
 
+    // Optionally save address to user's address book
+    if (user && saveAddressToAccount) {
+      try {
+        const addressExists = await prisma.address.findFirst({
+          where: {
+            userId: user.id,
+            addressLine1: addrLine1,
+            postalCode: addrPostal,
+          },
+        });
+
+        if (!addressExists) {
+          const count = await prisma.address.count({ where: { userId: user.id } });
+          await prisma.address.create({
+            data: {
+              userId: user.id,
+              fullName: sanitizeString(shippingAddress.fullName || sanitizedName, 100),
+              phone: sanitizeString(shippingAddress.phone || sanitizedPhone, 20),
+              addressLine1: addrLine1,
+              addressLine2: sanitizeString(shippingAddress.addressLine2 || shippingAddress.apartment, 200) || null,
+              city: addrCity,
+              state: sanitizeString(shippingAddress.state || 'India', 100),
+              postalCode: addrPostal,
+              country: sanitizeString(shippingAddress.country || 'India', 50),
+              addressType: shippingAddress.addressType || 'HOME',
+              isDefault: count === 0,
+            },
+          });
+        }
+      } catch (err) {
+        console.error('Failed to auto-save address in razorpay create-order:', err);
+      }
+    }
+
     // Create Razorpay order
     const razorpayOrder = await createRazorpayOrder(order.total, order.orderNumber);
 
@@ -129,11 +164,13 @@ export async function POST(request: Request) {
       data: { razorpayOrderId: razorpayOrder.id },
     });
 
-    const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholderKeyId';
+    const keyId = process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_placeholderKeyId';
+    const isSimulation = Boolean(razorpayOrder?.id?.startsWith('order_mock_'));
 
     return jsonSuccess({
       keyId,
       razorpayOrder,
+      isSimulation,
       order: {
         id: order.id,
         orderNumber: order.orderNumber,

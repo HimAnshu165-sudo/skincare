@@ -1,13 +1,17 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 
-const keyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholderKeyId';
-const keySecret = process.env.RAZORPAY_KEY_SECRET || 'placeholderSecretKey';
+export function getRazorpayClient(): Razorpay {
+  const keyId = process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_placeholderKeyId';
+  const keySecret = process.env.RAZORPAY_KEY_SECRET || 'placeholderSecretKey';
 
-export const razorpayInstance = new Razorpay({
-  key_id: keyId,
-  key_secret: keySecret,
-});
+  return new Razorpay({
+    key_id: keyId,
+    key_secret: keySecret,
+  });
+}
+
+export const razorpayInstance = getRazorpayClient();
 
 /**
  * Create Razorpay Order with amount in paise (1 INR = 100 paise).
@@ -21,7 +25,8 @@ export async function createRazorpayOrder(amountInRupees: number, receipt: strin
   };
 
   try {
-    const order = await razorpayInstance.orders.create(options);
+    const client = getRazorpayClient();
+    const order = await client.orders.create(options);
     return order;
   } catch (error: any) {
     console.error('Razorpay Order creation error:', error);
@@ -48,6 +53,8 @@ export function verifyRazorpaySignature(
     return false;
   }
 
+  const keySecret = process.env.RAZORPAY_KEY_SECRET || 'placeholderSecretKey';
+
   // If running in test mode with mock keys
   if (razorpayOrderId.startsWith('order_mock_') || keySecret === 'placeholderSecretKey') {
     return razorpaySignature.length > 5;
@@ -59,8 +66,8 @@ export function verifyRazorpaySignature(
       .update(`${razorpayOrderId}|${razorpayPaymentId}`)
       .digest('hex');
 
-    const generatedBuffer = Buffer.from(generatedSignature);
-    const signatureBuffer = Buffer.from(razorpaySignature);
+    const generatedBuffer = Buffer.from(generatedSignature, 'utf-8');
+    const signatureBuffer = Buffer.from(razorpaySignature, 'utf-8');
 
     if (generatedBuffer.length !== signatureBuffer.length) {
       return false;

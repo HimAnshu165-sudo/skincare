@@ -17,6 +17,27 @@ declare global {
   }
 }
 
+const loadRazorpayScript = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') return resolve(false);
+    if ((window as any).Razorpay) return resolve(true);
+
+    const existingScript = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', () => resolve(true));
+      existingScript.addEventListener('error', () => resolve(false));
+      if ((window as any).Razorpay) return resolve(true);
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 interface SavedAddress {
   id: string;
   fullName: string;
@@ -242,6 +263,9 @@ export function CheckoutForm() {
         showProcessing('Order confirmed!', 'Redirecting to your order confirmation receipt...');
         router.push(`/order-success?orderId=${data.order.id}&orderNumber=${data.order.orderNumber}`);
       } else {
+        // Ensure Razorpay SDK script is loaded
+        await loadRazorpayScript();
+
         // Online Payment Flow via Razorpay
         showProcessing(
           'Connecting to payment gateway...',
@@ -261,6 +285,7 @@ export function CheckoutForm() {
               quantity: i.quantity,
             })),
             couponCode: appliedCoupon?.code || null,
+            saveAddressToAccount: user ? saveAddressToAccount : false,
           }),
         });
 
@@ -270,8 +295,8 @@ export function CheckoutForm() {
           throw new Error(orderData.message || 'Error initializing payment gateway.');
         }
 
-        // Test simulation / fallback if Razorpay script is not loaded
-        if (orderData.isSimulation || !window.Razorpay) {
+        // Test simulation fallback only if mock order ID was returned
+        if (orderData.isSimulation || orderData.razorpayOrder?.id?.startsWith('order_mock_')) {
           showProcessing(
             'Verifying test payment signature...',
             'Validating test transaction with bank simulator...'
@@ -295,12 +320,20 @@ export function CheckoutForm() {
           return;
         }
 
+        // Verify Razorpay client object availability
+        if (!window.Razorpay) {
+          hideProcessing();
+          setLoading(false);
+          setErrorMsg('Unable to load Razorpay payment gateway. Please check your internet connection or ad-blocker.');
+          return;
+        }
+
         // Hide overlay while Razorpay modal is open for user interaction
         hideProcessing();
 
         // Live Razorpay SDK Modal
         const options = {
-          key: orderData.keyId,
+          key: orderData.keyId || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
           amount: orderData.razorpayOrder.amount,
           currency: 'INR',
           name: 'VELYRA Skincare',
@@ -326,13 +359,20 @@ export function CheckoutForm() {
 
               const verifyData = await verifyRes.json();
               if (verifyData.success) {
+                try {
+                  confetti({
+                    particleCount: 80,
+                    spread: 60,
+                    origin: { y: 0.6 },
+                  });
+                } catch {}
                 await clearCart();
                 showProcessing('Payment verified!', 'Redirecting to your order receipt...');
                 router.push(`/order-success?orderId=${orderData.order.id}&orderNumber=${orderData.order.orderNumber}`);
               } else {
                 hideProcessing();
                 setLoading(false);
-                setErrorMsg('Payment verification failed. Please contact concierge support.');
+                setErrorMsg(verifyData.message || 'Payment verification failed. Please contact concierge support.');
               }
             } catch {
               hideProcessing();
@@ -347,6 +387,12 @@ export function CheckoutForm() {
           },
           theme: {
             color: '#1A1817',
+          },
+          modal: {
+            ondismiss: function () {
+              hideProcessing();
+              setLoading(false);
+            },
           },
         };
 
